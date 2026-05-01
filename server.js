@@ -145,18 +145,20 @@ function dbRun(sql, params = []) {
 
 // ==================== PRODUCTION EMAIL SYSTEM ====================
 // Gmail SMTP — configured for cloud deployment (Render)
+// Note: We skip verify() because Render's network can timeout on idle SMTP handshakes.
+// Emails are sent on-demand — each sendMail() opens a fresh connection.
 
 let gmailTransporter = null;
 let emailReady = false;
 
-async function setupEmail() {
+function setupEmail() {
     console.log('');
     console.log('🔧 ═══ EMAIL SETUP ═══');
     console.log(`   EMAIL_USER set: ${!!process.env.EMAIL_USER}`);
     console.log(`   EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
 
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        // Explicit SMTP config — port 587 + STARTTLS works on cloud servers (Render, etc.)
+        // Gmail SMTP — port 587 + STARTTLS (cloud-compatible)
         gmailTransporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
             port: 587,
@@ -170,21 +172,15 @@ async function setupEmail() {
                 rejectUnauthorized: false
             },
             requireTLS: true,
-            connectionTimeout: 120000,
-            greetingTimeout: 120000,
-            socketTimeout: 120000
+            pool: false,
+            connectionTimeout: 30000,
+            greetingTimeout: 30000,
+            socketTimeout: 60000
         });
 
-        try {
-            await gmailTransporter.verify();
-            emailReady = true;
-            console.log('✅ Gmail SMTP — READY');
-            console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
-        } catch (err) {
-            console.error('❌ Gmail SMTP — FAILED:', err.message);
-            console.error('   → Check your Gmail App Password at: https://myaccount.google.com/apppasswords');
-            gmailTransporter = null;
-        }
+        emailReady = true;
+        console.log('✅ Gmail SMTP — CONFIGURED (send-on-demand)');
+        console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
     } else {
         console.log('🚫 EMAIL DISABLED — EMAIL_USER and EMAIL_PASS not set');
         console.log('   → Set them in Render Dashboard → Environment');
@@ -203,16 +199,20 @@ async function sendEmail({ to, subject, html }) {
     }
 
     try {
-        await gmailTransporter.sendMail({
+        const info = await gmailTransporter.sendMail({
             from: `"${fromName}" <${fromEmail}>`,
             to,
             subject,
             html
         });
-        console.log(`📧 Email sent to: ${to}`);
+        console.log(`📧 Email sent to: ${to} (messageId: ${info.messageId})`);
         return { provider: 'gmail' };
     } catch (err) {
         console.error(`❌ Email failed for ${to}:`, err.message);
+        // If it's an auth error, give a clear hint
+        if (err.message.includes('Invalid login') || err.message.includes('auth')) {
+            throw new Error('Gmail authentication failed — check your App Password at https://myaccount.google.com/apppasswords');
+        }
         throw new Error(`Email delivery failed: ${err.message}`);
     }
 }
