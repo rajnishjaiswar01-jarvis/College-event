@@ -16,6 +16,10 @@ const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render proxy fix
+app.set('trust proxy', 1);
+
+
 // ==================== SECURITY MIDDLEWARE ====================
 
 // Helmet: Sets various HTTP headers for security
@@ -66,7 +70,7 @@ const loginLimiter = rateLimit({
 app.use((req, res, next) => {
     // Skip API routes
     if (req.path.startsWith('/api/')) return next();
-    
+
     const blocked = ['.env', '.git', 'server.js', 'package.json', 'package-lock.json', 'database.sqlite', 'node_modules'];
     const reqPath = req.path.toLowerCase().replace(/^\//, '');
     for (const b of blocked) {
@@ -155,19 +159,17 @@ async function setupEmail() {
     // --- Provider 1: Gmail SMTP ---
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
         gmailTransporter = nodemailer.createTransport({
-            host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
+            service: 'gmail',
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             },
-            pool: true,              // Keep connections alive for faster sends
-            maxConnections: 3,
-            maxMessages: 50,
-            connectionTimeout: 10000,
-            greetingTimeout: 10000,
-            socketTimeout: 15000
+            tls: {
+                rejectUnauthorized: false
+            },
+            connectionTimeout: 30000,
+            greetingTimeout: 30000,
+            socketTimeout: 30000
         });
 
         try {
