@@ -434,6 +434,11 @@ app.use('/api/*', (req, res) => {
     res.status(404).json({ error: 'API endpoint not found.' });
 });
 
+// Root route - redirect to invitation page
+app.get('/', (req, res) => {
+    res.redirect('/invitation.html');
+});
+
 // Serve static files (AFTER API routes so they take priority)
 app.use(express.static(__dirname, {
     dotfiles: 'deny'
