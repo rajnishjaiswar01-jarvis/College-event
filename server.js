@@ -9,6 +9,7 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
@@ -139,61 +140,141 @@ function dbRun(sql, params = []) {
     saveDatabase();
 }
 
-// ==================== EMAIL TRANSPORTER ====================
-// Try Gmail first, fallback to Ethereal test email if Gmail fails
-let transporter;
-let emailMode = 'none';
+// ==================== PRODUCTION EMAIL SYSTEM ====================
+// Dual-provider: Gmail SMTP (primary) + SendGrid (fallback)
+// Guarantees email delivery — if one fails, the other takes over.
+
+let gmailTransporter = null;
+let sendgridReady = false;
+let emailProvider = 'none'; // 'gmail', 'sendgrid', or 'none'
 
 async function setupEmail() {
-    console.log('🔧 Setting up email...');
-    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
-    console.log('🔑 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 'NOT SET');
-    
-    // Try Gmail with optimized settings for cloud providers
-    const gmailTransporter = nodemailer.createTransport({
-        host: 'smtp.gmail.com',
-        port: 465,
-        secure: true,
-        auth: {
-            user: process.env.EMAIL_USER,
-            pass: process.env.EMAIL_PASS
-        },
-        connectionTimeout: 5000,
-        socketTimeout: 5000
-    });
+    console.log('');
+    console.log('🔧 ═══ EMAIL SETUP (Production) ═══');
 
-    try {
-        await gmailTransporter.verify();
-        transporter = gmailTransporter;
-        emailMode = 'gmail';
-        console.log('✅ SUCCESS! Email ready (Gmail): ' + process.env.EMAIL_USER);
-    } catch (err) {
-        console.log('❌ FAILED! Gmail verification error:', err.message);
-        console.log('   → You need an App Password, not your regular password');
-        console.log('   → Get one at: https://myaccount.google.com/apppasswords');
-        console.log('');
-        
-        // Fallback: Create free Ethereal test account
+    // --- Provider 1: Gmail SMTP ---
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        gmailTransporter = nodemailer.createTransport({
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            },
+            pool: true,              // Keep connections alive for faster sends
+            maxConnections: 3,
+            maxMessages: 50,
+            connectionTimeout: 10000,
+            greetingTimeout: 10000,
+            socketTimeout: 15000
+        });
+
         try {
-            const testAccount = await nodemailer.createTestAccount();
-            transporter = nodemailer.createTransport({
-                host: 'smtp.ethereal.email',
-                port: 587,
-                secure: false,
-                auth: {
-                    user: testAccount.user,
-                    pass: testAccount.pass
-                }
+            await gmailTransporter.verify();
+            emailProvider = 'gmail';
+            console.log('✅ Gmail SMTP — READY (Primary)');
+            console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
+        } catch (err) {
+            console.log('❌ Gmail SMTP — FAILED:', err.message);
+            console.log('   → Ensure you have an App Password: https://myaccount.google.com/apppasswords');
+            gmailTransporter = null;
+        }
+    } else {
+        console.log('⚠️  Gmail SMTP — SKIPPED (EMAIL_USER / EMAIL_PASS not set)');
+    }
+
+    // --- Provider 2: SendGrid API ---
+    if (process.env.SENDGRID_API_KEY) {
+        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+        sendgridReady = true;
+        if (emailProvider === 'none') emailProvider = 'sendgrid';
+        console.log(`✅ SendGrid API — READY (${emailProvider === 'sendgrid' ? 'Primary' : 'Fallback'})`);
+        console.log(`   📧 From: ${process.env.EMAIL_FROM || process.env.EMAIL_USER}`);
+    } else {
+        console.log('⚠️  SendGrid API — SKIPPED (SENDGRID_API_KEY not set)');
+    }
+
+    // --- Summary ---
+    if (emailProvider === 'none') {
+        console.log('');
+        console.log('🚫 NO EMAIL PROVIDER CONFIGURED — emails will be disabled.');
+        console.log('   Set up at least one:');
+        console.log('   • Gmail: EMAIL_USER + EMAIL_PASS (App Password)');
+        console.log('   • SendGrid: SENDGRID_API_KEY + EMAIL_FROM');
+    } else {
+        const fallback = (gmailTransporter && sendgridReady) ? ' (with fallback)' : '';
+        console.log(`\n🚀 Email provider: ${emailProvider.toUpperCase()}${fallback}`);
+    }
+    console.log('═══════════════════════════════════');
+    console.log('');
+}
+
+// Unified send function — tries primary, falls back to secondary
+async function sendEmail({ to, subject, html }) {
+    const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const fromName = 'IT Dept - Freshers & Farewell 2026';
+
+    if (emailProvider === 'none') {
+        throw new Error('No email provider configured');
+    }
+
+    // --- Attempt 1: Primary provider ---
+    if (emailProvider === 'gmail' && gmailTransporter) {
+        try {
+            await gmailTransporter.sendMail({
+                from: `"${fromName}" <${fromEmail}>`,
+                to,
+                subject,
+                html
             });
-            emailMode = 'ethereal';
-            console.log('✅ Email ready (Test Mode - Ethereal)');
-            console.log('   📧 Test emails viewable at: https://ethereal.email');
-            console.log('   Login: ' + testAccount.user + ' / ' + testAccount.pass);
-        } catch (e2) {
-            console.log('❌ Email completely disabled. Approvals will work but no emails sent.');
-            emailMode = 'none';
+            console.log(`📧 [Gmail] Email sent to: ${to}`);
+            return { provider: 'gmail' };
+        } catch (err) {
+            console.error(`❌ [Gmail] Failed for ${to}:`, err.message);
+            // Fall through to SendGrid
+            if (sendgridReady) {
+                console.log('   ↪ Falling back to SendGrid...');
+            }
         }
     }
+
+    // --- Attempt 2: SendGrid (primary or fallback) ---
+    if (sendgridReady) {
+        try {
+            await sgMail.send({
+                from: { email: fromEmail, name: fromName },
+                to,
+                subject,
+                html
+            });
+            console.log(`📧 [SendGrid] Email sent to: ${to}`);
+            return { provider: 'sendgrid' };
+        } catch (err) {
+            const errBody = err.response?.body?.errors?.[0]?.message || err.message;
+            console.error(`❌ [SendGrid] Failed for ${to}:`, errBody);
+            // Fall through to Gmail if it wasn't already tried
+            if (emailProvider === 'sendgrid' && gmailTransporter) {
+                console.log('   ↪ Falling back to Gmail...');
+                try {
+                    await gmailTransporter.sendMail({
+                        from: `"${fromName}" <${fromEmail}>`,
+                        to,
+                        subject,
+                        html
+                    });
+                    console.log(`📧 [Gmail fallback] Email sent to: ${to}`);
+                    return { provider: 'gmail' };
+                } catch (gmailErr) {
+                    console.error(`❌ [Gmail fallback] Also failed:`, gmailErr.message);
+                }
+            }
+            throw new Error(`All email providers failed for ${to}`);
+        }
+    }
+
+    // Gmail was primary but failed, no SendGrid available
+    throw new Error(`Email delivery failed — no fallback available`);
 }
 
 setupEmail();
@@ -365,20 +446,16 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
         dbRun("UPDATE registrations SET status = 'approved', updated_at = datetime('now') WHERE id = ?", [id]);
         console.log(`✅ Approved: ${reg.name} (${reg.email})`);
 
-        if (!transporter) {
-            return res.json({ success: true, message: 'Approved! (Email disabled - configure .env)' });
+        if (emailProvider === 'none') {
+            return res.json({ success: true, message: 'Approved! (Email disabled — configure Gmail or SendGrid in .env)' });
         }
         try {
-            const info = await transporter.sendMail({
-                from: `"IT Dept - Freshers & Farewell 2026" <${process.env.EMAIL_USER}>`,
+            const result = await sendEmail({
                 to: reg.email,
                 subject: '✅ Registration Approved — Freshers & Farewell 2026',
                 html: getApprovalEmailHTML(reg.name, reg.role)
             });
-            const previewUrl = emailMode === 'ethereal' ? nodemailer.getTestMessageUrl(info) : null;
-            if (previewUrl) console.log(`📧 Preview: ${previewUrl}`);
-            console.log(`📧 Email sent to: ${reg.email}`);
-            res.json({ success: true, message: `Approved & email sent to ${reg.email}`, previewUrl });
+            res.json({ success: true, message: `Approved & email sent to ${reg.email} via ${result.provider}` });
         } catch (emailErr) {
             console.error('Email error:', emailErr.message);
             res.json({ success: true, message: 'Approved, but email failed.', emailError: emailErr.message });
@@ -402,15 +479,18 @@ app.post('/api/admin/reject/:id', requireAdmin, async (req, res) => {
         dbRun("UPDATE registrations SET status = 'rejected', updated_at = datetime('now') WHERE id = ?", [id]);
         console.log(`❌ Rejected: ${reg.name} (${reg.email})`);
 
+        if (emailProvider === 'none') {
+            return res.json({ success: true, message: 'Rejected! (Email disabled — configure Gmail or SendGrid in .env)' });
+        }
         try {
-            await transporter.sendMail({
-                from: `"IT Dept - Freshers & Farewell 2026" <${process.env.EMAIL_USER}>`,
+            const result = await sendEmail({
                 to: reg.email,
                 subject: 'Registration Update — Freshers & Farewell 2026',
                 html: getRejectionEmailHTML(reg.name)
             });
-            res.json({ success: true, message: `Rejected & email sent to ${reg.email}` });
+            res.json({ success: true, message: `Rejected & email sent to ${reg.email} via ${result.provider}` });
         } catch (emailErr) {
+            console.error('Email error:', emailErr.message);
             res.json({ success: true, message: 'Rejected, but email failed.', emailError: emailErr.message });
         }
     } catch (err) {
