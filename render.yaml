@@ -7,9 +7,13 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: BREVO_API_KEY
+        sync: false
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_FROM
         sync: false
       - key: ADMIN_PASSWORD
         sync: false

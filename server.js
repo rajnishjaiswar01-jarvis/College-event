@@ -144,21 +144,31 @@ function dbRun(sql, params = []) {
 }
 
 // ==================== PRODUCTION EMAIL SYSTEM ====================
-// Gmail SMTP — configured for cloud deployment (Render)
-// Note: We skip verify() because Render's network can timeout on idle SMTP handshakes.
-// Emails are sent on-demand — each sendMail() opens a fresh connection.
+// Strategy: Brevo HTTP API (production) + Gmail SMTP fallback (localhost)
+//
+// WHY: Render free tier blocks ALL SMTP ports (25, 465, 587).
+//      Gmail SMTP works on localhost but NOT on Render/cloud.
+//      Brevo sends email via HTTP API (port 443) — works everywhere.
+//      Free tier: 300 emails/day, no credit card required.
+//      Sign up: https://app.brevo.com → SMTP & API → API Keys
 
 let gmailTransporter = null;
 let emailReady = false;
+let emailProvider = 'none'; // 'brevo' or 'gmail'
 
 function setupEmail() {
     console.log('');
     console.log('🔧 ═══ EMAIL SETUP ═══');
-    console.log(`   EMAIL_USER set: ${!!process.env.EMAIL_USER}`);
-    console.log(`   EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
 
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        // Gmail SMTP — port 587 + STARTTLS (cloud-compatible)
+    // Priority 1: Brevo HTTP API (works on Render & all cloud platforms)
+    if (process.env.BREVO_API_KEY) {
+        emailReady = true;
+        emailProvider = 'brevo';
+        console.log('✅ Brevo HTTP API — READY');
+        console.log(`   📧 Sending as: ${process.env.EMAIL_FROM || process.env.EMAIL_USER}`);
+    }
+    // Priority 2: Gmail SMTP (works on localhost only)
+    else if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
         gmailTransporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
             port: 587,
@@ -167,52 +177,88 @@ function setupEmail() {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             },
-            tls: {
-                ciphers: 'SSLv3',
-                rejectUnauthorized: false
-            },
+            tls: { ciphers: 'SSLv3', rejectUnauthorized: false },
             requireTLS: true,
             pool: false,
             connectionTimeout: 30000,
             greetingTimeout: 30000,
             socketTimeout: 60000
         });
-
         emailReady = true;
-        console.log('✅ Gmail SMTP — CONFIGURED (send-on-demand)');
+        emailProvider = 'gmail';
+        console.log('✅ Gmail SMTP — CONFIGURED (localhost only)');
         console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
+        console.log('   ⚠️  Note: Gmail SMTP will NOT work on Render. Set BREVO_API_KEY for production.');
     } else {
-        console.log('🚫 EMAIL DISABLED — EMAIL_USER and EMAIL_PASS not set');
-        console.log('   → Set them in Render Dashboard → Environment');
+        console.log('🚫 EMAIL DISABLED — no provider configured');
+        console.log('   → Set BREVO_API_KEY in Render Dashboard (free: https://app.brevo.com)');
+        console.log('   → Or set EMAIL_USER + EMAIL_PASS for localhost testing');
     }
 
     console.log('══════════════════════');
     console.log('');
 }
 
-async function sendEmail({ to, subject, html }) {
+// Send via Brevo HTTP API (no SMTP, no port restrictions)
+async function sendViaBrevo({ to, subject, html }) {
+    const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const fromName = 'IT Dept - Freshers & Farewell 2026';
+
+    const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+            'accept': 'application/json',
+            'api-key': process.env.BREVO_API_KEY,
+            'content-type': 'application/json'
+        },
+        body: JSON.stringify({
+            sender: { name: fromName, email: fromEmail },
+            to: [{ email: to }],
+            subject: subject,
+            htmlContent: html
+        })
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || `Brevo API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+}
+
+// Send via Gmail SMTP (localhost fallback)
+async function sendViaGmail({ to, subject, html }) {
     const fromEmail = process.env.EMAIL_USER;
     const fromName = 'IT Dept - Freshers & Farewell 2026';
 
-    if (!emailReady || !gmailTransporter) {
-        throw new Error('Email not configured — set EMAIL_USER and EMAIL_PASS in Render Environment');
+    const info = await gmailTransporter.sendMail({
+        from: `"${fromName}" <${fromEmail}>`,
+        to,
+        subject,
+        html
+    });
+    return info;
+}
+
+// Unified send function
+async function sendEmail({ to, subject, html }) {
+    if (!emailReady) {
+        throw new Error('Email not configured — set BREVO_API_KEY in Render Environment');
     }
 
     try {
-        const info = await gmailTransporter.sendMail({
-            from: `"${fromName}" <${fromEmail}>`,
-            to,
-            subject,
-            html
-        });
-        console.log(`📧 Email sent to: ${to} (messageId: ${info.messageId})`);
-        return { provider: 'gmail' };
-    } catch (err) {
-        console.error(`❌ Email failed for ${to}:`, err.message);
-        // If it's an auth error, give a clear hint
-        if (err.message.includes('Invalid login') || err.message.includes('auth')) {
-            throw new Error('Gmail authentication failed — check your App Password at https://myaccount.google.com/apppasswords');
+        if (emailProvider === 'brevo') {
+            await sendViaBrevo({ to, subject, html });
+            console.log(`📧 [Brevo] Email sent to: ${to}`);
+        } else {
+            await sendViaGmail({ to, subject, html });
+            console.log(`📧 [Gmail] Email sent to: ${to}`);
         }
+        return { provider: emailProvider };
+    } catch (err) {
+        console.error(`❌ [${emailProvider}] Email failed for ${to}:`, err.message);
         throw new Error(`Email delivery failed: ${err.message}`);
     }
 }
@@ -462,7 +508,9 @@ app.get('/api/health', (req, res) => {
     res.json({
         status: 'ok',
         email: emailReady ? 'configured' : 'not configured',
+        emailProvider: emailProvider,
         emailUser: process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 3) + '***' : 'NOT SET',
+        brevoKey: process.env.BREVO_API_KEY ? 'SET' : 'NOT SET',
         uptime: Math.floor(process.uptime()) + 's'
     });
 });
@@ -470,7 +518,7 @@ app.get('/api/health', (req, res) => {
 // --- Admin: Test email (verify email works on production) ---
 app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
     if (!emailReady) {
-        return res.status(500).json({ error: 'Email not configured. Set EMAIL_USER and EMAIL_PASS in Render Environment.' });
+        return res.status(500).json({ error: 'Email not configured. Set BREVO_API_KEY in Render Environment (free at https://app.brevo.com).' });
     }
     try {
         await sendEmail({
