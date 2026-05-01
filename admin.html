@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard — Registration Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --neon-cyan: #00f5ff;
+            --neon-green: #39ff14;
+            --neon-purple: #bf5af2;
+            --neon-blue: #0a84ff;
+            --neon-pink: #ff2d55;
+            --neon-orange: #ff9500;
+            --bg-dark: #0a0e17;
+            --bg-card: rgba(15, 22, 36, 0.75);
+            --border: rgba(0, 245, 255, 0.12);
+            --border-hover: rgba(0, 245, 255, 0.35);
+            --text: #e4eaf5;
+            --text-muted: #7a8ba8;
+            --gradient-cyber: linear-gradient(135deg, #00f5ff, #0a84ff, #bf5af2);
+            --radius: 16px;
+            --radius-sm: 10px;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Outfit',sans-serif; background:var(--bg-dark); color:var(--text); min-height:100vh; }
+        ::-webkit-scrollbar { width:5px; }
+        ::-webkit-scrollbar-track { background:var(--bg-dark); }
+        ::-webkit-scrollbar-thumb { background:var(--neon-cyan); border-radius:10px; }
+
+        /* LOGIN */
+        .login-overlay { position:fixed; inset:0; background:var(--bg-dark); display:flex; align-items:center; justify-content:center; z-index:9999; }
+        .login-card { background:var(--bg-card); border:1px solid var(--border); border-radius:20px; padding:44px 36px; width:90%; max-width:400px; text-align:center; backdrop-filter:blur(20px); position:relative; }
+        .login-card::before { content:''; position:absolute; top:-1px; left:20%; right:20%; height:2px; background:var(--gradient-cyber); border-radius:2px; }
+        .login-card h2 { font-size:1.5rem; margin-bottom:8px; }
+        .login-card p { color:var(--text-muted); font-size:0.9rem; margin-bottom:24px; }
+        .login-card input { width:100%; padding:13px 16px; background:rgba(0,245,255,0.03); border:1px solid rgba(0,245,255,0.1); border-radius:var(--radius-sm); color:var(--text); font-size:0.95rem; font-family:'Outfit',sans-serif; outline:none; transition:all 0.3s; margin-bottom:16px; }
+        .login-card input:focus { border-color:var(--neon-cyan); box-shadow:0 0 0 3px rgba(0,245,255,0.08); }
+        .login-error { color:var(--neon-pink); font-size:0.82rem; margin-bottom:12px; display:none; }
+
+        /* HEADER */
+        .admin-header { padding:20px 5%; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border); background:rgba(10,14,23,0.9); backdrop-filter:blur(20px); position:sticky; top:0; z-index:100; }
+        .admin-logo { font-family:'JetBrains Mono',monospace; font-size:1.1rem; font-weight:700; background:var(--gradient-cyber); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .admin-logo::before { content:'> '; color:var(--neon-green); -webkit-text-fill-color:var(--neon-green); }
+        .logout-btn { padding:8px 20px; background:transparent; border:1px solid rgba(255,45,85,0.3); border-radius:8px; color:var(--neon-pink); font-family:'JetBrains Mono',monospace; font-size:0.78rem; cursor:pointer; transition:all 0.3s; }
+        .logout-btn:hover { background:rgba(255,45,85,0.1); border-color:var(--neon-pink); }
+
+        /* STATS */
+        .stats-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:20px; padding:28px 5%; }
+        .stat-card { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:24px; backdrop-filter:blur(12px); transition:all 0.3s; position:relative; overflow:hidden; }
+        .stat-card::before { content:''; position:absolute; top:0; left:20%; right:20%; height:2px; border-radius:2px; }
+        .stat-card:nth-child(1)::before { background:var(--gradient-cyber); }
+        .stat-card:nth-child(2)::before { background:linear-gradient(135deg,#ff9500,#ff2d55); }
+        .stat-card:nth-child(3)::before { background:linear-gradient(135deg,#39ff14,#00f5ff); }
+        .stat-card:nth-child(4)::before { background:linear-gradient(135deg,#ff2d55,#bf5af2); }
+        .stat-card:hover { transform:translateY(-4px); border-color:var(--border-hover); }
+        .stat-card .stat-number { font-family:'JetBrains Mono',monospace; font-size:2rem; font-weight:700; }
+        .stat-card:nth-child(1) .stat-number { color:var(--neon-cyan); }
+        .stat-card:nth-child(2) .stat-number { color:var(--neon-orange); }
+        .stat-card:nth-child(3) .stat-number { color:var(--neon-green); }
+        .stat-card:nth-child(4) .stat-number { color:var(--neon-pink); }
+        .stat-card .stat-label { font-size:0.82rem; color:var(--text-muted); margin-top:4px; text-transform:uppercase; letter-spacing:1px; }
+
+        /* FILTERS */
+        .controls { padding:0 5% 20px; display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+        .filter-btn { padding:8px 20px; background:rgba(0,245,255,0.04); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-family:'JetBrains Mono',monospace; font-size:0.78rem; cursor:pointer; transition:all 0.3s; text-transform:uppercase; letter-spacing:1px; }
+        .filter-btn:hover { border-color:var(--neon-cyan); color:var(--text); }
+        .filter-btn.active { background:rgba(0,245,255,0.12); border-color:var(--neon-cyan); color:var(--neon-cyan); }
+        .refresh-btn { margin-left:auto; padding:8px 20px; background:rgba(57,255,20,0.06); border:1px solid rgba(57,255,20,0.2); border-radius:8px; color:var(--neon-green); font-family:'JetBrains Mono',monospace; font-size:0.78rem; cursor:pointer; transition:all 0.3s; }
+        .refresh-btn:hover { background:rgba(57,255,20,0.12); border-color:var(--neon-green); }
+
+        /* TABLE */
+        .table-container { padding:0 5% 40px; overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+        thead { background:rgba(0,245,255,0.04); }
+        th { font-family:'JetBrains Mono',monospace; font-size:0.72rem; color:var(--neon-cyan); text-transform:uppercase; letter-spacing:1.5px; padding:14px 16px; text-align:left; border-bottom:1px solid var(--border); }
+        td { padding:14px 16px; font-size:0.9rem; border-bottom:1px solid rgba(0,245,255,0.05); color:var(--text); }
+        tr:hover td { background:rgba(0,245,255,0.02); }
+        .empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); }
+        .empty-state i { font-size:2.5rem; margin-bottom:16px; opacity:0.3; display:block; }
+
+        /* BADGES */
+        .badge { padding:4px 12px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:0.68rem; font-weight:600; text-transform:uppercase; letter-spacing:1px; display:inline-block; }
+        .badge-pending { background:rgba(255,149,0,0.12); color:var(--neon-orange); border:1px solid rgba(255,149,0,0.25); }
+        .badge-approved { background:rgba(57,255,20,0.1); color:var(--neon-green); border:1px solid rgba(57,255,20,0.25); }
+        .badge-rejected { background:rgba(255,45,85,0.1); color:var(--neon-pink); border:1px solid rgba(255,45,85,0.25); }
+
+        /* ACTION BUTTONS */
+        .action-btn { padding:6px 14px; border-radius:6px; font-family:'JetBrains Mono',monospace; font-size:0.7rem; cursor:pointer; transition:all 0.3s; border:1px solid; margin-right:6px; }
+        .btn-approve { background:rgba(57,255,20,0.08); border-color:rgba(57,255,20,0.25); color:var(--neon-green); }
+        .btn-approve:hover { background:rgba(57,255,20,0.2); border-color:var(--neon-green); }
+        .btn-reject { background:rgba(255,45,85,0.08); border-color:rgba(255,45,85,0.25); color:var(--neon-pink); }
+        .btn-reject:hover { background:rgba(255,45,85,0.2); border-color:var(--neon-pink); }
+        .btn-delete { background:rgba(122,139,168,0.08); border-color:rgba(122,139,168,0.25); color:var(--text-muted); }
+        .btn-delete:hover { background:rgba(122,139,168,0.2); }
+
+        /* BTN PRIMARY */
+        .btn-primary { display:inline-flex; align-items:center; gap:8px; padding:12px 28px; background:var(--gradient-cyber); color:white; border:none; border-radius:8px; font-size:0.95rem; font-weight:600; font-family:'Outfit',sans-serif; cursor:pointer; transition:all 0.3s; width:100%; justify-content:center; }
+        .btn-primary:hover { transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,245,255,0.3); }
+
+        /* TOAST */
+        .toast { position:fixed; bottom:24px; right:24px; padding:14px 24px; border-radius:12px; font-size:0.88rem; z-index:10000; animation:slideUp 0.4s ease; display:none; backdrop-filter:blur(20px); max-width:400px; }
+        .toast-success { background:rgba(57,255,20,0.12); border:1px solid rgba(57,255,20,0.3); color:var(--neon-green); }
+        .toast-error { background:rgba(255,45,85,0.12); border:1px solid rgba(255,45,85,0.3); color:var(--neon-pink); }
+        @keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .actions-cell { white-space:nowrap; }
+
+        @media (max-width:768px) {
+            .stats-grid { grid-template-columns:repeat(2,1fr); gap:12px; }
+            .controls { flex-direction:column; }
+            .refresh-btn { margin-left:0; width:100%; text-align:center; }
+            td, th { padding:10px 8px; font-size:0.8rem; }
+            .action-btn { padding:5px 8px; font-size:0.65rem; margin-bottom:4px; display:inline-block; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-overlay" id="loginOverlay">
+    <div class="login-card">
+        <h2><i class="fas fa-shield-halved" style="color:var(--neon-cyan);margin-right:8px;"></i>Admin Access</h2>
+        <p>Enter the admin password to manage registrations</p>
+        <div class="login-error" id="loginError">Invalid password. Try again.</div>
+        <input type="password" id="loginPassword" placeholder="Enter admin password" autofocus>
+        <button class="btn-primary" id="loginBtn" onclick="handleLogin()">
+            <i class="fas fa-lock-open"></i> authenticate()
+        </button>
+    </div>
+</div>
+
+<!-- MAIN DASHBOARD -->
+<div id="dashboard" style="display:none;">
+    <header class="admin-header">
+        <div class="admin-logo">ADMIN_PANEL</div>
+        <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> logout()</button>
+    </header>
+
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-number" id="statTotal">0</div><div class="stat-label">Total</div></div>
+        <div class="stat-card"><div class="stat-number" id="statPending">0</div><div class="stat-label">Pending</div></div>
+        <div class="stat-card"><div class="stat-number" id="statApproved">0</div><div class="stat-label">Approved</div></div>
+        <div class="stat-card"><div class="stat-number" id="statRejected">0</div><div class="stat-label">Rejected</div></div>
+    </div>
+
+    <div class="controls">
+        <button class="filter-btn active" data-filter="" onclick="setFilter(this,'')">All</button>
+        <button class="filter-btn" data-filter="pending" onclick="setFilter(this,'pending')">Pending</button>
+        <button class="filter-btn" data-filter="approved" onclick="setFilter(this,'approved')">Approved</button>
+        <button class="filter-btn" data-filter="rejected" onclick="setFilter(this,'rejected')">Rejected</button>
+        <button class="refresh-btn" onclick="fetchRegistrations()"><i class="fas fa-sync-alt"></i> Refresh</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Registered</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr><td colspan="8" class="empty-state"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+    let adminPassword = '';
+    let currentFilter = '';
+
+    // --- LOGIN ---
+    document.getElementById('loginPassword').addEventListener('keypress', e => { if(e.key==='Enter') handleLogin(); });
+
+    async function handleLogin() {
+        const pw = document.getElementById('loginPassword').value;
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pw })
+            });
+            if (res.ok) {
+                adminPassword = pw;
+                document.getElementById('loginOverlay').style.display = 'none';
+                document.getElementById('dashboard').style.display = 'block';
+                fetchRegistrations();
+            } else {
+                const err = document.getElementById('loginError');
+                err.style.display = 'block';
+                document.getElementById('loginPassword').value = '';
+                document.getElementById('loginPassword').focus();
+            }
+        } catch (e) {
+            showToast('Cannot connect to server. Is it running?', 'error');
+        }
+    }
+
+    function handleLogout() {
+        adminPassword = '';
+        document.getElementById('loginOverlay').style.display = 'flex';
+        document.getElementById('dashboard').style.display = 'none';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginError').style.display = 'none';
+    }
+
+    // --- FETCH DATA ---
+    async function fetchRegistrations() {
+        try {
+            const url = currentFilter ? `/api/admin/registrations?status=${currentFilter}` : '/api/admin/registrations';
+            const res = await fetch(url, { headers: { 'X-Admin-Password': adminPassword } });
+            if (!res.ok) throw new Error('Unauthorized');
+            const data = await res.json();
+
+            // Update stats
+            document.getElementById('statTotal').textContent = data.stats.total;
+            document.getElementById('statPending').textContent = data.stats.pending;
+            document.getElementById('statApproved').textContent = data.stats.approved;
+            document.getElementById('statRejected').textContent = data.stats.rejected;
+
+            // Update table
+            renderTable(data.registrations);
+        } catch (e) {
+            showToast('Failed to load data: ' + e.message, 'error');
+        }
+    }
+
+    function renderTable(rows) {
+        const tbody = document.getElementById('tableBody');
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-inbox"></i>No registrations found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((r, i) => `
+            <tr>
+                <td style="color:var(--text-muted);font-family:'JetBrains Mono',monospace;font-size:0.78rem;">${r.id}</td>
+                <td><strong>${esc(r.name)}</strong></td>
+                <td style="font-size:0.85rem;">${esc(r.email)}</td>
+                <td style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;">${esc(r.phone)}</td>
+                <td><span class="badge badge-${r.role === 'Ex-TY' ? 'pending' : 'approved'}" style="background:rgba(10,132,255,0.1);color:var(--neon-blue);border-color:rgba(10,132,255,0.25);">${esc(r.role)}</span></td>
+                <td><span class="badge badge-${r.status}">${r.status}</span></td>
+                <td style="font-size:0.82rem;color:var(--text-muted);">${formatDate(r.created_at)}</td>
+                <td class="actions-cell">
+                    ${r.status === 'pending' ? `
+                        <button class="action-btn btn-approve" onclick="approveReg(${r.id})"><i class="fas fa-check"></i> Approve</button>
+                        <button class="action-btn btn-reject" onclick="rejectReg(${r.id})"><i class="fas fa-times"></i> Reject</button>
+                    ` : ''}
+                    <button class="action-btn btn-delete" onclick="deleteReg(${r.id})"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // --- ACTIONS ---
+    async function approveReg(id) {
+        if (!confirm('Approve this registration? An email will be sent.')) return;
+        try {
+            const res = await fetch(`/api/admin/approve/${id}`, {
+                method: 'POST',
+                headers: { 'X-Admin-Password': adminPassword }
+            });
+            const data = await res.json();
+            showToast(data.message || 'Approved!', res.ok ? 'success' : 'error');
+            fetchRegistrations();
+        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function rejectReg(id) {
+        if (!confirm('Reject this registration?')) return;
+        try {
+            const res = await fetch(`/api/admin/reject/${id}`, {
+                method: 'POST',
+                headers: { 'X-Admin-Password': adminPassword }
+            });
+            const data = await res.json();
+            showToast(data.message || 'Rejected.', res.ok ? 'success' : 'error');
+            fetchRegistrations();
+        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    async function deleteReg(id) {
+        if (!confirm('Permanently delete this registration?')) return;
+        try {
+            const res = await fetch(`/api/admin/delete/${id}`, {
+                method: 'DELETE',
+                headers: { 'X-Admin-Password': adminPassword }
+            });
+            const data = await res.json();
+            showToast(data.message || 'Deleted.', res.ok ? 'success' : 'error');
+            fetchRegistrations();
+        } catch (e) { showToast('Error: ' + e.message, 'error'); }
+    }
+
+    // --- FILTERS ---
+    function setFilter(btn, filter) {
+        currentFilter = filter;
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        fetchRegistrations();
+    }
+
+    // --- HELPERS ---
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    function formatDate(d) { if (!d) return '—'; return new Date(d + 'Z').toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }); }
+    function showToast(msg, type) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast toast-' + type;
+        t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 4000);
+    }
+
+    // Auto-refresh every 30 seconds
+    setInterval(() => { if (adminPassword) fetchRegistrations(); }, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Environment variables (SENSITIVE - contains passwords!)
+.env
+
+# Database (will be created automatically on server)
+database.sqlite
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
