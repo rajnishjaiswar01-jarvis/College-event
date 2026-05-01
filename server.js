@@ -149,13 +149,17 @@ async function setupEmail() {
     console.log('📧 EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
     console.log('🔑 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 'NOT SET');
     
-    // Try Gmail
+    // Try Gmail with optimized settings for cloud providers
     const gmailTransporter = nodemailer.createTransport({
-        service: 'gmail',
+        host: 'smtp.gmail.com',
+        port: 465,
+        secure: true,
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS
-        }
+        },
+        connectionTimeout: 5000,
+        socketTimeout: 5000
     });
 
     try {
