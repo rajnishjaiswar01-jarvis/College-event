@@ -164,12 +164,9 @@ async function setupEmail() {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             },
-            tls: {
-                rejectUnauthorized: false
-            },
-            connectionTimeout: 30000,
-            greetingTimeout: 30000,
-            socketTimeout: 30000
+            connectionTimeout: 60000,
+            greetingTimeout: 60000,
+            socketTimeout: 60000
         });
 
         try {
@@ -179,7 +176,7 @@ async function setupEmail() {
             console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
         } catch (err) {
             console.log('❌ Gmail SMTP — FAILED:', err.message);
-            console.log('   → Ensure you have an App Password: https://myaccount.google.com/apppasswords');
+            console.log('   → Ensure Gmail App Password is correct');
             gmailTransporter = null;
         }
     } else {
