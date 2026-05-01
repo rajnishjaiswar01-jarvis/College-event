@@ -9,7 +9,6 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
-const sgMail = require('@sendgrid/mail');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
@@ -145,135 +144,75 @@ function dbRun(sql, params = []) {
 }
 
 // ==================== PRODUCTION EMAIL SYSTEM ====================
-// Dual-provider: Gmail SMTP (primary) + SendGrid (fallback)
-// Guarantees email delivery — if one fails, the other takes over.
+// Gmail SMTP — configured for cloud deployment (Render)
 
 let gmailTransporter = null;
-let sendgridReady = false;
-let emailProvider = 'none'; // 'gmail', 'sendgrid', or 'none'
+let emailReady = false;
 
 async function setupEmail() {
     console.log('');
-    console.log('🔧 ═══ EMAIL SETUP (Production) ═══');
+    console.log('🔧 ═══ EMAIL SETUP ═══');
+    console.log(`   EMAIL_USER set: ${!!process.env.EMAIL_USER}`);
+    console.log(`   EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
 
-    // --- Provider 1: Gmail SMTP ---
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+        // Explicit SMTP config — works reliably on cloud servers (Render, Railway, etc.)
         gmailTransporter = nodemailer.createTransport({
-            service: 'gmail',
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: true,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             },
-            connectionTimeout: 60000,
-            greetingTimeout: 60000,
-            socketTimeout: 60000
+            tls: {
+                rejectUnauthorized: false
+            },
+            connectionTimeout: 120000,
+            greetingTimeout: 120000,
+            socketTimeout: 120000
         });
 
         try {
             await gmailTransporter.verify();
-            emailProvider = 'gmail';
-            console.log('✅ Gmail SMTP — READY (Primary)');
+            emailReady = true;
+            console.log('✅ Gmail SMTP — READY');
             console.log(`   📧 Sending as: ${process.env.EMAIL_USER}`);
         } catch (err) {
-            console.log('❌ Gmail SMTP — FAILED:', err.message);
-            console.log('   → Ensure Gmail App Password is correct');
+            console.error('❌ Gmail SMTP — FAILED:', err.message);
+            console.error('   → Check your Gmail App Password at: https://myaccount.google.com/apppasswords');
             gmailTransporter = null;
         }
     } else {
-        console.log('⚠️  Gmail SMTP — SKIPPED (EMAIL_USER / EMAIL_PASS not set)');
+        console.log('🚫 EMAIL DISABLED — EMAIL_USER and EMAIL_PASS not set');
+        console.log('   → Set them in Render Dashboard → Environment');
     }
 
-    // --- Provider 2: SendGrid API ---
-    if (process.env.SENDGRID_API_KEY) {
-        sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-        sendgridReady = true;
-        if (emailProvider === 'none') emailProvider = 'sendgrid';
-        console.log(`✅ SendGrid API — READY (${emailProvider === 'sendgrid' ? 'Primary' : 'Fallback'})`);
-        console.log(`   📧 From: ${process.env.EMAIL_FROM || process.env.EMAIL_USER}`);
-    } else {
-        console.log('⚠️  SendGrid API — SKIPPED (SENDGRID_API_KEY not set)');
-    }
-
-    // --- Summary ---
-    if (emailProvider === 'none') {
-        console.log('');
-        console.log('🚫 NO EMAIL PROVIDER CONFIGURED — emails will be disabled.');
-        console.log('   Set up at least one:');
-        console.log('   • Gmail: EMAIL_USER + EMAIL_PASS (App Password)');
-        console.log('   • SendGrid: SENDGRID_API_KEY + EMAIL_FROM');
-    } else {
-        const fallback = (gmailTransporter && sendgridReady) ? ' (with fallback)' : '';
-        console.log(`\n🚀 Email provider: ${emailProvider.toUpperCase()}${fallback}`);
-    }
-    console.log('═══════════════════════════════════');
+    console.log('══════════════════════');
     console.log('');
 }
 
-// Unified send function — tries primary, falls back to secondary
 async function sendEmail({ to, subject, html }) {
-    const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+    const fromEmail = process.env.EMAIL_USER;
     const fromName = 'IT Dept - Freshers & Farewell 2026';
 
-    if (emailProvider === 'none') {
-        throw new Error('No email provider configured');
+    if (!emailReady || !gmailTransporter) {
+        throw new Error('Email not configured — set EMAIL_USER and EMAIL_PASS in Render Environment');
     }
 
-    // --- Attempt 1: Primary provider ---
-    if (emailProvider === 'gmail' && gmailTransporter) {
-        try {
-            await gmailTransporter.sendMail({
-                from: `"${fromName}" <${fromEmail}>`,
-                to,
-                subject,
-                html
-            });
-            console.log(`📧 [Gmail] Email sent to: ${to}`);
-            return { provider: 'gmail' };
-        } catch (err) {
-            console.error(`❌ [Gmail] Failed for ${to}:`, err.message);
-            // Fall through to SendGrid
-            if (sendgridReady) {
-                console.log('   ↪ Falling back to SendGrid...');
-            }
-        }
+    try {
+        await gmailTransporter.sendMail({
+            from: `"${fromName}" <${fromEmail}>`,
+            to,
+            subject,
+            html
+        });
+        console.log(`📧 Email sent to: ${to}`);
+        return { provider: 'gmail' };
+    } catch (err) {
+        console.error(`❌ Email failed for ${to}:`, err.message);
+        throw new Error(`Email delivery failed: ${err.message}`);
     }
-
-    // --- Attempt 2: SendGrid (primary or fallback) ---
-    if (sendgridReady) {
-        try {
-            await sgMail.send({
-                from: { email: fromEmail, name: fromName },
-                to,
-                subject,
-                html
-            });
-            console.log(`📧 [SendGrid] Email sent to: ${to}`);
-            return { provider: 'sendgrid' };
-        } catch (err) {
-            const errBody = err.response?.body?.errors?.[0]?.message || err.message;
-            console.error(`❌ [SendGrid] Failed for ${to}:`, errBody);
-            // Fall through to Gmail if it wasn't already tried
-            if (emailProvider === 'sendgrid' && gmailTransporter) {
-                console.log('   ↪ Falling back to Gmail...');
-                try {
-                    await gmailTransporter.sendMail({
-                        from: `"${fromName}" <${fromEmail}>`,
-                        to,
-                        subject,
-                        html
-                    });
-                    console.log(`📧 [Gmail fallback] Email sent to: ${to}`);
-                    return { provider: 'gmail' };
-                } catch (gmailErr) {
-                    console.error(`❌ [Gmail fallback] Also failed:`, gmailErr.message);
-                }
-            }
-            throw new Error(`All email providers failed for ${to}`);
-        }
-    }
-
-    // Gmail was primary but failed, no SendGrid available
-    throw new Error(`Email delivery failed — no fallback available`);
 }
 
 setupEmail();
@@ -445,8 +384,8 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
         dbRun("UPDATE registrations SET status = 'approved', updated_at = datetime('now') WHERE id = ?", [id]);
         console.log(`✅ Approved: ${reg.name} (${reg.email})`);
 
-        if (emailProvider === 'none') {
-            return res.json({ success: true, message: 'Approved! (Email disabled — configure Gmail or SendGrid in .env)' });
+        if (!emailReady) {
+            return res.json({ success: true, message: 'Approved! (Email disabled — set EMAIL_USER & EMAIL_PASS in Render Environment)' });
         }
         try {
             const result = await sendEmail({
@@ -454,7 +393,7 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
                 subject: '✅ Registration Approved — Freshers & Farewell 2026',
                 html: getApprovalEmailHTML(reg.name, reg.role)
             });
-            res.json({ success: true, message: `Approved & email sent to ${reg.email} via ${result.provider}` });
+            res.json({ success: true, message: `Approved & email sent to ${reg.email}` });
         } catch (emailErr) {
             console.error('Email error:', emailErr.message);
             res.json({ success: true, message: 'Approved, but email failed.', emailError: emailErr.message });
@@ -478,8 +417,8 @@ app.post('/api/admin/reject/:id', requireAdmin, async (req, res) => {
         dbRun("UPDATE registrations SET status = 'rejected', updated_at = datetime('now') WHERE id = ?", [id]);
         console.log(`❌ Rejected: ${reg.name} (${reg.email})`);
 
-        if (emailProvider === 'none') {
-            return res.json({ success: true, message: 'Rejected! (Email disabled — configure Gmail or SendGrid in .env)' });
+        if (!emailReady) {
+            return res.json({ success: true, message: 'Rejected! (Email disabled — set EMAIL_USER & EMAIL_PASS in Render Environment)' });
         }
         try {
             const result = await sendEmail({
@@ -487,7 +426,7 @@ app.post('/api/admin/reject/:id', requireAdmin, async (req, res) => {
                 subject: 'Registration Update — Freshers & Farewell 2026',
                 html: getRejectionEmailHTML(reg.name)
             });
-            res.json({ success: true, message: `Rejected & email sent to ${reg.email} via ${result.provider}` });
+            res.json({ success: true, message: `Rejected & email sent to ${reg.email}` });
         } catch (emailErr) {
             console.error('Email error:', emailErr.message);
             res.json({ success: true, message: 'Rejected, but email failed.', emailError: emailErr.message });
@@ -513,6 +452,33 @@ app.delete('/api/admin/delete/:id', requireAdmin, (req, res) => {
     } catch (err) {
         console.error('Delete error:', err);
         res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+// --- Health check (for Render & monitoring) ---
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        email: emailReady ? 'configured' : 'not configured',
+        emailUser: process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 3) + '***' : 'NOT SET',
+        uptime: Math.floor(process.uptime()) + 's'
+    });
+});
+
+// --- Admin: Test email (verify email works on production) ---
+app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
+    if (!emailReady) {
+        return res.status(500).json({ error: 'Email not configured. Set EMAIL_USER and EMAIL_PASS in Render Environment.' });
+    }
+    try {
+        await sendEmail({
+            to: process.env.EMAIL_USER,
+            subject: '✅ Test Email — Server is Working!',
+            html: '<h2>Your email system is working!</h2><p>This test was sent from your Render deployment.</p>'
+        });
+        res.json({ success: true, message: `Test email sent to ${process.env.EMAIL_USER}` });
+    } catch (err) {
+        res.status(500).json({ error: 'Email test failed: ' + err.message });
     }
 });
 
