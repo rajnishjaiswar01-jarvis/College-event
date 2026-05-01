@@ -156,18 +156,20 @@ async function setupEmail() {
     console.log(`   EMAIL_PASS set: ${!!process.env.EMAIL_PASS}`);
 
     if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-        // Explicit SMTP config — works reliably on cloud servers (Render, Railway, etc.)
+        // Explicit SMTP config — port 587 + STARTTLS works on cloud servers (Render, etc.)
         gmailTransporter = nodemailer.createTransport({
             host: 'smtp.gmail.com',
-            port: 465,
-            secure: true,
+            port: 587,
+            secure: false,
             auth: {
                 user: process.env.EMAIL_USER,
                 pass: process.env.EMAIL_PASS
             },
             tls: {
+                ciphers: 'SSLv3',
                 rejectUnauthorized: false
             },
+            requireTLS: true,
             connectionTimeout: 120000,
             greetingTimeout: 120000,
             socketTimeout: 120000
