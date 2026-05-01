@@ -145,6 +145,10 @@ let transporter;
 let emailMode = 'none';
 
 async function setupEmail() {
+    console.log('🔧 Setting up email...');
+    console.log('📧 EMAIL_USER:', process.env.EMAIL_USER || 'NOT SET');
+    console.log('🔑 EMAIL_PASS length:', process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : 'NOT SET');
+    
     // Try Gmail
     const gmailTransporter = nodemailer.createTransport({
         service: 'gmail',
@@ -158,9 +162,9 @@ async function setupEmail() {
         await gmailTransporter.verify();
         transporter = gmailTransporter;
         emailMode = 'gmail';
-        console.log('✅ Email ready (Gmail): ' + process.env.EMAIL_USER);
+        console.log('✅ SUCCESS! Email ready (Gmail): ' + process.env.EMAIL_USER);
     } catch (err) {
-        console.log('⚠️  Gmail failed:', err.message);
+        console.log('❌ FAILED! Gmail verification error:', err.message);
         console.log('   → You need an App Password, not your regular password');
         console.log('   → Get one at: https://myaccount.google.com/apppasswords');
         console.log('');
