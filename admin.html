@@ -157,7 +157,10 @@
         <button class="filter-btn" data-filter="pending" onclick="setFilter(this,'pending')">Pending</button>
         <button class="filter-btn" data-filter="approved" onclick="setFilter(this,'approved')">Approved</button>
         <button class="filter-btn" data-filter="rejected" onclick="setFilter(this,'rejected')">Rejected</button>
+        <button class="filter-btn" data-filter="attended" onclick="setFilter(this,'attended')" style="border-color:rgba(57,255,20,0.25);color:var(--neon-green);"><i class="fas fa-check-circle"></i> Attended</button>
+        <button class="filter-btn" data-filter="absent" onclick="setFilter(this,'absent')" style="border-color:rgba(255,149,0,0.25);color:#ff9500;"><i class="fas fa-user-slash"></i> Absent</button>
         <button class="refresh-btn" onclick="fetchRegistrations()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        <button class="refresh-btn" onclick="downloadCSV()" style="background:rgba(57,255,20,0.06);border-color:rgba(57,255,20,0.2);color:var(--neon-green);"><i class="fas fa-file-csv"></i> Download CSV</button>
     </div>
 
     <div class="table-container">
@@ -225,12 +228,15 @@
     }
 
     // --- FETCH DATA ---
+    let allRegistrations = []; // store for CSV export
+
     async function fetchRegistrations() {
         try {
-            const url = currentFilter ? `/api/admin/registrations?status=${currentFilter}` : '/api/admin/registrations';
-            const res = await fetch(url, { headers: { 'X-Admin-Password': adminPassword } });
+            // Always fetch all data for stats, then filter client-side for attended/absent
+            const res = await fetch('/api/admin/registrations', { headers: { 'X-Admin-Password': adminPassword } });
             if (!res.ok) throw new Error('Unauthorized');
             const data = await res.json();
+            allRegistrations = data.registrations;
 
             // Update stats
             document.getElementById('statTotal').textContent = data.stats.total;
@@ -239,8 +245,18 @@
             document.getElementById('statRejected').textContent = data.stats.rejected;
             document.getElementById('statAttended').textContent = data.stats.attended || 0;
 
+            // Apply filter
+            let filtered = data.registrations;
+            if (currentFilter === 'attended') {
+                filtered = data.registrations.filter(r => r.attended);
+            } else if (currentFilter === 'absent') {
+                filtered = data.registrations.filter(r => r.status === 'approved' && !r.attended);
+            } else if (currentFilter) {
+                filtered = data.registrations.filter(r => r.status === currentFilter);
+            }
+
             // Update table
-            renderTable(data.registrations);
+            renderTable(filtered);
         } catch (e) {
             showToast('Failed to load data: ' + e.message, 'error');
         }
@@ -319,6 +335,60 @@
         document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         fetchRegistrations();
+    }
+
+    // --- CSV EXPORT ---
+    function downloadCSV() {
+        if (!allRegistrations.length) { showToast('No data to export.', 'error'); return; }
+
+        // Choose what to export based on current filter
+        let rows = allRegistrations;
+        let filename = 'all_registrations.csv';
+        if (currentFilter === 'attended') {
+            rows = allRegistrations.filter(r => r.attended);
+            filename = 'attendance_present.csv';
+        } else if (currentFilter === 'absent') {
+            rows = allRegistrations.filter(r => r.status === 'approved' && !r.attended);
+            filename = 'attendance_absent.csv';
+        } else if (currentFilter === 'approved') {
+            rows = allRegistrations.filter(r => r.status === 'approved');
+            filename = 'approved_registrations.csv';
+        } else if (currentFilter === 'pending') {
+            rows = allRegistrations.filter(r => r.status === 'pending');
+            filename = 'pending_registrations.csv';
+        } else if (currentFilter === 'rejected') {
+            rows = allRegistrations.filter(r => r.status === 'rejected');
+            filename = 'rejected_registrations.csv';
+        }
+
+        if (!rows.length) { showToast('No records to export for this filter.', 'error'); return; }
+
+        // Build CSV with BOM for Excel compatibility
+        const headers = ['#', 'Name', 'Email', 'Phone', 'Role', 'Status', 'Attended', 'Check-in Time', 'Registered At'];
+        const csvRows = [
+            headers.join(','),
+            ...rows.map((r, i) => [
+                r.id,
+                '"' + (r.name || '').replace(/"/g, '""') + '"',
+                '"' + (r.email || '') + '"',
+                '"' + (r.phone || '') + '"',
+                r.role,
+                r.status,
+                r.attended ? 'Yes' : 'No',
+                r.attended_at ? '"' + r.attended_at + '"' : '',
+                r.created_at ? '"' + r.created_at + '"' : ''
+            ].join(','))
+        ];
+
+        const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast(`Downloaded ${rows.length} records as ${filename}`, 'success');
     }
 
     // --- HELPERS ---
