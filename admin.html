@@ -138,7 +138,10 @@
 <div id="dashboard" style="display:none;">
     <header class="admin-header">
         <div class="admin-logo">ADMIN_PANEL</div>
-        <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> logout()</button>
+        <div style="display:flex;gap:10px;align-items:center;">
+            <a href="/scanner.html" style="padding:8px 20px;background:rgba(57,255,20,0.06);border:1px solid rgba(57,255,20,0.2);border-radius:8px;color:var(--neon-green);font-family:'JetBrains Mono',monospace;font-size:0.78rem;text-decoration:none;transition:all 0.3s;"><i class="fas fa-qrcode"></i> Scanner</a>
+            <button class="logout-btn" onclick="handleLogout()"><i class="fas fa-sign-out-alt"></i> logout()</button>
+        </div>
     </header>
 
     <div class="stats-grid" id="statsGrid">
@@ -146,6 +149,7 @@
         <div class="stat-card"><div class="stat-number" id="statPending">0</div><div class="stat-label">Pending</div></div>
         <div class="stat-card"><div class="stat-number" id="statApproved">0</div><div class="stat-label">Approved</div></div>
         <div class="stat-card"><div class="stat-number" id="statRejected">0</div><div class="stat-label">Rejected</div></div>
+        <div class="stat-card"><div class="stat-number" id="statAttended" style="color:var(--neon-green);">0</div><div class="stat-label">Attended</div></div>
     </div>
 
     <div class="controls">
@@ -166,12 +170,13 @@
                     <th>Phone</th>
                     <th>Role</th>
                     <th>Status</th>
+                    <th>Attended</th>
                     <th>Registered</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
-                <tr><td colspan="8" class="empty-state"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>
+                <tr><td colspan="9" class="empty-state"><i class="fas fa-spinner fa-spin"></i>Loading...</td></tr>
             </tbody>
         </table>
     </div>
@@ -232,6 +237,7 @@
             document.getElementById('statPending').textContent = data.stats.pending;
             document.getElementById('statApproved').textContent = data.stats.approved;
             document.getElementById('statRejected').textContent = data.stats.rejected;
+            document.getElementById('statAttended').textContent = data.stats.attended || 0;
 
             // Update table
             renderTable(data.registrations);
@@ -243,7 +249,7 @@
     function renderTable(rows) {
         const tbody = document.getElementById('tableBody');
         if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-inbox"></i>No registrations found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="empty-state"><i class="fas fa-inbox"></i>No registrations found</td></tr>';
             return;
         }
         tbody.innerHTML = rows.map((r, i) => `
@@ -254,6 +260,7 @@
                 <td style="font-family:'JetBrains Mono',monospace;font-size:0.82rem;">${esc(r.phone)}</td>
                 <td><span class="badge badge-${r.role === 'Ex-TY' ? 'pending' : 'approved'}" style="background:rgba(10,132,255,0.1);color:var(--neon-blue);border-color:rgba(10,132,255,0.25);">${esc(r.role)}</span></td>
                 <td><span class="badge badge-${r.status}">${r.status}</span></td>
+                <td>${r.attended ? '<span class="badge badge-approved" style="font-size:0.65rem;">✅ Yes</span>' : (r.status === 'approved' ? '<span class="badge" style="background:rgba(122,139,168,0.08);color:var(--text-muted);border:1px solid rgba(122,139,168,0.15);font-size:0.65rem;">—</span>' : '')}</td>
                 <td style="font-size:0.82rem;color:var(--text-muted);">${formatDate(r.created_at)}</td>
                 <td class="actions-cell">
                     ${r.status === 'pending' ? `

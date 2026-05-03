@@ -9,6 +9,8 @@ const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const QRCode = require('qrcode');
+const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
@@ -107,10 +109,18 @@ async function initDatabase() {
             phone TEXT NOT NULL,
             role TEXT NOT NULL,
             status TEXT DEFAULT 'pending',
+            checkin_token TEXT,
+            attended INTEGER DEFAULT 0,
+            attended_at TEXT,
             created_at TEXT DEFAULT (datetime('now')),
             updated_at TEXT DEFAULT (datetime('now'))
         )
     `);
+
+    // Migrate existing DB: add new columns if missing
+    try { db.run('ALTER TABLE registrations ADD COLUMN checkin_token TEXT'); } catch(e) { /* column exists */ }
+    try { db.run('ALTER TABLE registrations ADD COLUMN attended INTEGER DEFAULT 0'); } catch(e) { /* column exists */ }
+    try { db.run('ALTER TABLE registrations ADD COLUMN attended_at TEXT'); } catch(e) { /* column exists */ }
 
     saveDatabase();
 }
@@ -294,7 +304,7 @@ function requireAdmin(req, res, next) {
 }
 
 // ==================== EMAIL TEMPLATES ====================
-function getApprovalEmailHTML(name, role) {
+function getApprovalEmailHTML(name, role, qrDataUrl) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#0a0e17;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
 <div style="max-width:600px;margin:0 auto;background:#0f1624;border:1px solid rgba(0,245,255,0.15);border-radius:16px;overflow:hidden;">
@@ -311,6 +321,16 @@ function getApprovalEmailHTML(name, role) {
 <tr><td style="color:#7a8ba8;font-size:14px;padding:6px 0;">Role:</td><td style="color:#e4eaf5;font-size:14px;padding:6px 0;text-align:right;font-weight:600;">${role}</td></tr>
 <tr><td style="color:#7a8ba8;font-size:14px;padding:6px 0;">Status:</td><td style="color:#39ff14;font-size:14px;padding:6px 0;text-align:right;font-weight:600;">✓ Approved</td></tr>
 </table></div>
+<div style="background:rgba(57,255,20,0.04);border:2px solid rgba(57,255,20,0.2);border-radius:16px;padding:28px;margin-bottom:24px;text-align:center;">
+<h3 style="color:#39ff14;font-size:13px;text-transform:uppercase;letter-spacing:2px;margin:0 0 6px;">🎫 Your Entry Pass</h3>
+<p style="color:#7a8ba8;font-size:12px;margin:0 0 20px;">Show this QR code at the event entrance</p>
+<div style="background:white;display:inline-block;padding:12px;border-radius:12px;">
+<img src="${qrDataUrl}" alt="Entry QR Code" style="width:200px;height:200px;display:block;" />
+</div>
+<p style="color:#e4eaf5;font-size:14px;font-weight:600;margin:16px 0 4px;">${name}</p>
+<p style="color:#7a8ba8;font-size:12px;margin:0;">Role: ${role}</p>
+<p style="color:rgba(122,139,168,0.6);font-size:11px;margin:8px 0 0;font-style:italic;">⚠️ Do not share this QR code — it's unique to you</p>
+</div>
 <div style="background:rgba(191,90,242,0.05);border:1px solid rgba(191,90,242,0.12);border-radius:12px;padding:20px;margin-bottom:24px;">
 <h3 style="color:#bf5af2;font-size:13px;text-transform:uppercase;letter-spacing:2px;margin:0 0 12px;">Quick Reminders</h3>
 <ul style="color:#7a8ba8;font-size:14px;line-height:2;margin:0;padding-left:20px;">
@@ -409,7 +429,8 @@ app.get('/api/admin/registrations', requireAdmin, (req, res) => {
             total: (dbGet('SELECT COUNT(*) as count FROM registrations') || {}).count || 0,
             pending: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'pending'") || {}).count || 0,
             approved: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'approved'") || {}).count || 0,
-            rejected: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'rejected'") || {}).count || 0
+            rejected: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'rejected'") || {}).count || 0,
+            attended: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0
         };
 
         res.json({ registrations: rows, stats });
@@ -429,19 +450,29 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
         if (!reg) return res.status(404).json({ error: 'Not found.' });
         if (reg.status === 'approved') return res.status(400).json({ error: 'Already approved.' });
 
-        dbRun("UPDATE registrations SET status = 'approved', updated_at = datetime('now') WHERE id = ?", [id]);
-        console.log(`✅ Approved: ${reg.name} (${reg.email})`);
+        // Generate unique check-in token for QR code
+        const checkinToken = crypto.randomUUID();
+
+        dbRun("UPDATE registrations SET status = 'approved', checkin_token = ?, updated_at = datetime('now') WHERE id = ?", [checkinToken, id]);
+        console.log(`✅ Approved: ${reg.name} (${reg.email}) — Token: ${checkinToken.substring(0, 8)}...`);
 
         if (!emailReady) {
-            return res.json({ success: true, message: 'Approved! (Email disabled — set EMAIL_USER & EMAIL_PASS in Render Environment)' });
+            return res.json({ success: true, message: 'Approved! (Email disabled — set BREVO_API_KEY in Render Environment)' });
         }
         try {
+            // Generate QR code as base64 data URL
+            const qrDataUrl = await QRCode.toDataURL(checkinToken, {
+                width: 300,
+                margin: 1,
+                color: { dark: '#0a0e17', light: '#ffffff' }
+            });
+
             const result = await sendEmail({
                 to: reg.email,
                 subject: '✅ Registration Approved — Freshers & Farewell 2026',
-                html: getApprovalEmailHTML(reg.name, reg.role)
+                html: getApprovalEmailHTML(reg.name, reg.role, qrDataUrl)
             });
-            res.json({ success: true, message: `Approved & email sent to ${reg.email}` });
+            res.json({ success: true, message: `Approved & email with QR sent to ${reg.email}` });
         } catch (emailErr) {
             console.error('Email error:', emailErr.message);
             res.json({ success: true, message: 'Approved, but email failed.', emailError: emailErr.message });
@@ -503,14 +534,77 @@ app.delete('/api/admin/delete/:id', requireAdmin, (req, res) => {
     }
 });
 
+// --- ADMIN: Check-in via QR scan ---
+app.post('/api/admin/checkin/:token', requireAdmin, (req, res) => {
+    try {
+        const token = req.params.token;
+        if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid QR code.' });
+
+        const reg = dbGet('SELECT * FROM registrations WHERE checkin_token = ?', [token]);
+        if (!reg) return res.status(404).json({ error: 'Invalid QR code — not found in system.', valid: false });
+        if (reg.status !== 'approved') return res.status(400).json({ error: `Registration is ${reg.status}, not approved.`, valid: false });
+        if (reg.attended) {
+            return res.status(409).json({
+                error: `Already checked in!`,
+                valid: true,
+                duplicate: true,
+                name: reg.name,
+                role: reg.role,
+                attended_at: reg.attended_at
+            });
+        }
+
+        dbRun("UPDATE registrations SET attended = 1, attended_at = datetime('now') WHERE id = ?", [reg.id]);
+        console.log(`🎫 Checked in: ${reg.name} (${reg.role})`);
+
+        const attendedCount = (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0;
+
+        res.json({
+            success: true,
+            valid: true,
+            name: reg.name,
+            role: reg.role,
+            email: reg.email,
+            message: `✅ ${reg.name} checked in!`,
+            attendedTotal: attendedCount
+        });
+    } catch (err) {
+        console.error('Check-in error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
+// --- ADMIN: Attendance list ---
+app.get('/api/admin/attendance', requireAdmin, (req, res) => {
+    try {
+        const attended = dbAll("SELECT id, name, email, phone, role, attended_at FROM registrations WHERE attended = 1 ORDER BY attended_at DESC");
+        const totalApproved = (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'approved'") || {}).count || 0;
+        const totalAttended = attended.length;
+
+        res.json({
+            attended,
+            stats: {
+                totalApproved,
+                totalAttended,
+                remaining: totalApproved - totalAttended
+            }
+        });
+    } catch (err) {
+        console.error('Attendance error:', err);
+        res.status(500).json({ error: 'Server error.' });
+    }
+});
+
 // --- Health check (for Render & monitoring) ---
 app.get('/api/health', (req, res) => {
+    const attendedCount = db ? (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0 : 0;
     res.json({
         status: 'ok',
         email: emailReady ? 'configured' : 'not configured',
         emailProvider: emailProvider,
         emailUser: process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 3) + '***' : 'NOT SET',
         brevoKey: process.env.BREVO_API_KEY ? 'SET' : 'NOT SET',
+        attended: attendedCount,
         uptime: Math.floor(process.uptime()) + 's'
     });
 });
@@ -569,6 +663,7 @@ initDatabase().then(() => {
         console.log(`📄 PC:     http://localhost:${PORT}/invitation.html`);
         console.log(`📱 Mobile: http://${localIP}:${PORT}/invitation.html`);
         console.log(`🔐 Admin:  http://localhost:${PORT}/admin.html`);
+        console.log(`🎫 Scanner: http://${localIP}:${PORT}/scanner.html`);
         console.log(`\n🛡️  Security: Helmet, Rate Limiting, Input Sanitization — ACTIVE`);
         console.log(`-------------------------------------------\n`);
     });
