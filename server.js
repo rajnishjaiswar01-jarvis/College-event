@@ -304,7 +304,7 @@ function requireAdmin(req, res, next) {
 }
 
 // ==================== EMAIL TEMPLATES ====================
-function getApprovalEmailHTML(name, role, qrDataUrl) {
+function getApprovalEmailHTML(name, role, qrImageUrl) {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
 <body style="margin:0;padding:0;background:#0a0e17;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;">
 <div style="max-width:600px;margin:0 auto;background:#0f1624;border:1px solid rgba(0,245,255,0.15);border-radius:16px;overflow:hidden;">
@@ -325,7 +325,7 @@ function getApprovalEmailHTML(name, role, qrDataUrl) {
 <h3 style="color:#39ff14;font-size:13px;text-transform:uppercase;letter-spacing:2px;margin:0 0 6px;">🎫 Your Entry Pass</h3>
 <p style="color:#7a8ba8;font-size:12px;margin:0 0 20px;">Show this QR code at the event entrance</p>
 <div style="background:white;display:inline-block;padding:12px;border-radius:12px;">
-<img src="${qrDataUrl}" alt="Entry QR Code" style="width:200px;height:200px;display:block;" />
+<img src="${qrImageUrl}" alt="Entry QR Code" style="width:200px;height:200px;display:block;" />
 </div>
 <p style="color:#e4eaf5;font-size:14px;font-weight:600;margin:16px 0 4px;">${name}</p>
 <p style="color:#7a8ba8;font-size:12px;margin:0;">Role: ${role}</p>
@@ -460,17 +460,16 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
             return res.json({ success: true, message: 'Approved! (Email disabled — set BREVO_API_KEY in Render Environment)' });
         }
         try {
-            // Generate QR code as base64 data URL
-            const qrDataUrl = await QRCode.toDataURL(checkinToken, {
-                width: 300,
-                margin: 1,
-                color: { dark: '#0a0e17', light: '#ffffff' }
-            });
+            // Build public QR image URL (Gmail blocks base64 data URLs)
+            const baseUrl = process.env.RENDER_EXTERNAL_URL
+                || process.env.BASE_URL
+                || `https://college-event-4hph.onrender.com`;
+            const qrImageUrl = `${baseUrl}/api/qr/${checkinToken}`;
 
             const result = await sendEmail({
                 to: reg.email,
                 subject: '✅ Registration Approved — Freshers & Farewell 2026',
-                html: getApprovalEmailHTML(reg.name, reg.role, qrDataUrl)
+                html: getApprovalEmailHTML(reg.name, reg.role, qrImageUrl)
             });
             res.json({ success: true, message: `Approved & email with QR sent to ${reg.email}` });
         } catch (emailErr) {
@@ -623,6 +622,35 @@ app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
         res.json({ success: true, message: `Test email sent to ${process.env.EMAIL_USER}` });
     } catch (err) {
         res.status(500).json({ error: 'Email test failed: ' + err.message });
+    }
+});
+
+// --- PUBLIC: QR code image endpoint (serves QR as PNG) ---
+// Gmail blocks base64 data URLs, so we serve QR via a public URL
+app.get('/api/qr/:token', async (req, res) => {
+    try {
+        const token = req.params.token;
+        if (!token || token.length < 10) return res.status(400).send('Invalid token');
+
+        // Verify token exists in DB (only show QR for approved registrations)
+        const reg = dbGet('SELECT id, status FROM registrations WHERE checkin_token = ?', [token]);
+        if (!reg || reg.status !== 'approved') return res.status(404).send('Not found');
+
+        // Generate QR as PNG buffer
+        const qrBuffer = await QRCode.toBuffer(token, {
+            width: 300,
+            margin: 1,
+            color: { dark: '#0a0e17', light: '#ffffff' }
+        });
+
+        res.set({
+            'Content-Type': 'image/png',
+            'Cache-Control': 'public, max-age=31536000, immutable'
+        });
+        res.send(qrBuffer);
+    } catch (err) {
+        console.error('QR generation error:', err);
+        res.status(500).send('Error generating QR');
     }
 });
 
