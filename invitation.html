@@ -18,25 +18,26 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <style>
         :root {
-            --neon-cyan: #00f5ff;
-            --neon-green: #39ff14;
-            --neon-purple: #bf5af2;
-            --neon-blue: #0a84ff;
-            --neon-pink: #ff2d55;
-            --bg-dark: #0a0e17;
-            --bg-card: rgba(15, 22, 36, 0.75);
-            --bg-card-hover: rgba(20, 30, 50, 0.85);
-            --border: rgba(0, 245, 255, 0.12);
-            --border-hover: rgba(0, 245, 255, 0.35);
-            --text: #e4eaf5;
-            --text-muted: #7a8ba8;
-            --gradient-cyber: linear-gradient(135deg, #00f5ff, #0a84ff, #bf5af2);
-            --gradient-neon: linear-gradient(135deg, #39ff14, #00f5ff);
-            --glow-cyan: 0 0 30px rgba(0, 245, 255, 0.3);
-            --glow-green: 0 0 30px rgba(57, 255, 20, 0.25);
+            --neon-cyan: #00d4ff;
+            --neon-green: #4ade80;
+            --neon-purple: #a855f7;
+            --neon-blue: #6366f1;
+            --neon-pink: #f472b6;
+            --bg-dark: #030014;
+            --bg-card: rgba(10, 10, 40, 0.65);
+            --bg-card-hover: rgba(20, 15, 60, 0.8);
+            --border: rgba(100, 100, 255, 0.1);
+            --border-hover: rgba(168, 85, 247, 0.35);
+            --text: #e8e8ff;
+            --text-muted: #8b8bba;
+            --gradient-cyber: linear-gradient(135deg, #6366f1, #a855f7, #ec4899);
+            --gradient-neon: linear-gradient(135deg, #a855f7, #6366f1);
+            --glow-cyan: 0 0 30px rgba(99, 102, 241, 0.35);
+            --glow-green: 0 0 30px rgba(168, 85, 247, 0.3);
             --radius: 16px;
             --radius-sm: 10px;
         }
@@ -59,6 +60,49 @@
             -webkit-font-smoothing: antialiased;
         }
 
+        /* ===== 3D SPACE CANVAS ===== */
+        #space-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .hero, .events-section, .register-section, .highlights-section,
+        .venue-section, .dresscode-section, .schedule-section,
+        .notices-section, .contact-section, .footer {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== SHOOTING STARS ===== */
+        .shooting-star {
+            position: fixed;
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(90deg, rgba(168,85,247,0), rgba(168,85,247,0.8), rgba(255,255,255,1));
+            border-radius: 2px;
+            opacity: 0;
+            z-index: 0;
+            pointer-events: none;
+            animation: shootingStar 3s ease-in-out infinite;
+        }
+        .shooting-star:nth-child(1) { top: 15%; left: 80%; animation-delay: 0s; }
+        .shooting-star:nth-child(2) { top: 35%; left: 60%; animation-delay: 4s; animation-duration: 2.5s; }
+        .shooting-star:nth-child(3) { top: 55%; left: 90%; animation-delay: 7s; animation-duration: 3.5s; }
+        .shooting-star:nth-child(4) { top: 75%; left: 70%; animation-delay: 11s; animation-duration: 2.8s; }
+
+        @keyframes shootingStar {
+            0% { transform: translateX(0) translateY(0) rotate(-35deg); opacity: 0; }
+            5% { opacity: 1; }
+            15% { opacity: 1; }
+            20% { transform: translateX(-300px) translateY(200px) rotate(-35deg); opacity: 0; }
+            100% { opacity: 0; }
+        }
+
         ::-webkit-scrollbar {
             width: 5px;
         }
@@ -68,7 +112,7 @@
         }
 
         ::-webkit-scrollbar-thumb {
-            background: var(--neon-cyan);
+            background: linear-gradient(180deg, var(--neon-purple), var(--neon-blue));
             border-radius: 10px;
         }
 
@@ -1569,69 +1613,204 @@
 </head>
 
 <body>
+    <canvas id="space-canvas"></canvas>
+    <div class="shooting-star"></div>
+    <div class="shooting-star"></div>
+    <div class="shooting-star"></div>
+    <div class="shooting-star"></div>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
 
-        // ==================== MATRIX RAIN ====================
-        function MatrixRain() {
-            const canvasRef = useRef(null);
+        // ==================== 3D SPACE SCENE ====================
+        function initSpaceScene() {
+            const canvas = document.getElementById('space-canvas');
+            if (!canvas || canvas.dataset.initialized) return;
+            canvas.dataset.initialized = 'true';
 
-            useEffect(() => {
-                const canvas = canvasRef.current;
-                const ctx = canvas.getContext('2d');
-                canvas.width = window.innerWidth;
-                canvas.height = window.innerHeight;
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-                const chars = '01{}[]<>/\\=+-*&|!@#$%^();:function const let var return if else for while class import export async await';
-                const charArr = chars.split('');
-                const fontSize = 13;
-                const columns = Math.floor(canvas.width / fontSize);
-                const drops = Array(columns).fill(1);
+            // === STARS ===
+            const starCount = window.innerWidth < 768 ? 800 : 2000;
+            const starGeometry = new THREE.BufferGeometry();
+            const starPositions = new Float32Array(starCount * 3);
+            const starSizes = new Float32Array(starCount);
+            for (let i = 0; i < starCount; i++) {
+                starPositions[i * 3] = (Math.random() - 0.5) * 100;
+                starPositions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+                starPositions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+                starSizes[i] = Math.random() * 2 + 0.5;
+            }
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+            starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
 
-                function draw() {
-                    ctx.fillStyle = 'rgba(10, 14, 23, 0.06)';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const starMaterial = new THREE.PointsMaterial({
+                color: 0xe8e8ff,
+                size: 0.15,
+                transparent: true,
+                opacity: 0.9,
+                sizeAttenuation: true
+            });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
 
-                    ctx.fillStyle = '#00f5ff';
-                    ctx.font = fontSize + 'px JetBrains Mono, monospace';
+            // === COLORED STAR LAYERS ===
+            const blueStarGeo = new THREE.BufferGeometry();
+            const bluePos = new Float32Array(300 * 3);
+            for (let i = 0; i < 300; i++) {
+                bluePos[i * 3] = (Math.random() - 0.5) * 80;
+                bluePos[i * 3 + 1] = (Math.random() - 0.5) * 80;
+                bluePos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+            }
+            blueStarGeo.setAttribute('position', new THREE.BufferAttribute(bluePos, 3));
+            const blueStars = new THREE.Points(blueStarGeo, new THREE.PointsMaterial({
+                color: 0x6366f1, size: 0.2, transparent: true, opacity: 0.7, sizeAttenuation: true
+            }));
+            scene.add(blueStars);
 
-                    for (let i = 0; i < drops.length; i++) {
-                        const text = charArr[Math.floor(Math.random() * charArr.length)];
-                        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+            const purpleStarGeo = new THREE.BufferGeometry();
+            const purplePos = new Float32Array(200 * 3);
+            for (let i = 0; i < 200; i++) {
+                purplePos[i * 3] = (Math.random() - 0.5) * 80;
+                purplePos[i * 3 + 1] = (Math.random() - 0.5) * 80;
+                purplePos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+            }
+            purpleStarGeo.setAttribute('position', new THREE.BufferAttribute(purplePos, 3));
+            const purpleStars = new THREE.Points(purpleStarGeo, new THREE.PointsMaterial({
+                color: 0xa855f7, size: 0.25, transparent: true, opacity: 0.6, sizeAttenuation: true
+            }));
+            scene.add(purpleStars);
 
-                        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
-                            drops[i] = 0;
-                        }
-                        drops[i]++;
-                    }
-                }
+            // === FLOATING WIREFRAME SHAPES ===
+            const shapes = [];
+            const shapeMaterials = [
+                new THREE.MeshBasicMaterial({ color: 0x6366f1, wireframe: true, transparent: true, opacity: 0.15 }),
+                new THREE.MeshBasicMaterial({ color: 0xa855f7, wireframe: true, transparent: true, opacity: 0.12 }),
+                new THREE.MeshBasicMaterial({ color: 0xec4899, wireframe: true, transparent: true, opacity: 0.1 }),
+                new THREE.MeshBasicMaterial({ color: 0x00d4ff, wireframe: true, transparent: true, opacity: 0.12 })
+            ];
+            const geometries = [
+                new THREE.IcosahedronGeometry(1.5, 1),
+                new THREE.OctahedronGeometry(1.2, 0),
+                new THREE.TorusKnotGeometry(0.8, 0.3, 64, 8),
+                new THREE.TorusGeometry(1, 0.3, 8, 6),
+                new THREE.DodecahedronGeometry(1.1, 0)
+            ];
 
-                const interval = setInterval(draw, 50);
-
-                const handleResize = () => {
-                    canvas.width = window.innerWidth;
-                    canvas.height = window.innerHeight;
+            for (let i = 0; i < 8; i++) {
+                const geo = geometries[i % geometries.length];
+                const mat = shapeMaterials[i % shapeMaterials.length];
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(
+                    (Math.random() - 0.5) * 40,
+                    (Math.random() - 0.5) * 40,
+                    (Math.random() - 0.5) * 30 - 10
+                );
+                mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0);
+                mesh.userData = {
+                    rotSpeed: { x: (Math.random() - 0.5) * 0.01, y: (Math.random() - 0.5) * 0.01 },
+                    floatSpeed: Math.random() * 0.003 + 0.001,
+                    floatOffset: Math.random() * Math.PI * 2
                 };
-                window.addEventListener('resize', handleResize);
+                shapes.push(mesh);
+                scene.add(mesh);
+            }
 
-                return () => {
-                    clearInterval(interval);
-                    window.removeEventListener('resize', handleResize);
-                };
-            }, []);
+            // === NEBULA CLOUDS ===
+            const nebulaGroup = new THREE.Group();
+            const nebulaColors = [0x6366f1, 0xa855f7, 0xec4899, 0x3b82f6];
+            for (let i = 0; i < 6; i++) {
+                const nebGeo = new THREE.SphereGeometry(3 + Math.random() * 4, 16, 16);
+                const nebMat = new THREE.MeshBasicMaterial({
+                    color: nebulaColors[i % nebulaColors.length],
+                    transparent: true,
+                    opacity: 0.03 + Math.random() * 0.02
+                });
+                const nebMesh = new THREE.Mesh(nebGeo, nebMat);
+                nebMesh.position.set(
+                    (Math.random() - 0.5) * 30,
+                    (Math.random() - 0.5) * 20,
+                    -15 - Math.random() * 15
+                );
+                nebulaGroup.add(nebMesh);
+            }
+            scene.add(nebulaGroup);
 
-            return <canvas ref={canvasRef} id="matrixCanvas"></canvas>;
+            camera.position.z = 30;
+
+            // === MOUSE PARALLAX ===
+            let mouseX = 0, mouseY = 0;
+            const handleMouseMove = (e) => {
+                mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+                mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+            };
+            window.addEventListener('mousemove', handleMouseMove);
+
+            // === SCROLL EFFECT ===
+            let scrollProgress = 0;
+            const handleScroll = () => {
+                scrollProgress = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+            };
+            window.addEventListener('scroll', handleScroll);
+
+            // === RESIZE ===
+            const handleResize = () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            };
+            window.addEventListener('resize', handleResize);
+
+            // === ANIMATE ===
+            let time = 0;
+            function animate() {
+                requestAnimationFrame(animate);
+                time += 0.005;
+
+                // Rotate star fields slowly
+                stars.rotation.y += 0.0002;
+                stars.rotation.x += 0.0001;
+                blueStars.rotation.y -= 0.0003;
+                purpleStars.rotation.y += 0.00025;
+
+                // Mouse parallax
+                camera.position.x += (mouseX * 3 - camera.position.x) * 0.02;
+                camera.position.y += (-mouseY * 2 - camera.position.y) * 0.02;
+                camera.lookAt(0, 0, 0);
+
+                // Scroll zoom effect
+                camera.position.z = 30 + scrollProgress * 15;
+                starMaterial.opacity = Math.max(0.2, 0.9 - scrollProgress * 0.5);
+
+                // Animate floating shapes
+                shapes.forEach((shape, i) => {
+                    shape.rotation.x += shape.userData.rotSpeed.x;
+                    shape.rotation.y += shape.userData.rotSpeed.y;
+                    shape.position.y += Math.sin(time * 2 + shape.userData.floatOffset) * shape.userData.floatSpeed;
+                });
+
+                // Nebula pulse
+                nebulaGroup.children.forEach((neb, i) => {
+                    neb.scale.setScalar(1 + Math.sin(time + i) * 0.1);
+                });
+
+                renderer.render(scene, camera);
+            }
+            animate();
         }
 
-        // ==================== FLOATING TECH ICONS ====================
+        // ==================== FLOATING SPACE ICONS ====================
         function FloatingIcons() {
             const icons = [
-                'fa-code', 'fa-laptop-code', 'fa-microchip', 'fa-database',
-                'fa-terminal', 'fa-server', 'fa-wifi', 'fa-shield-halved',
-                'fa-bug', 'fa-code-branch', 'fa-cloud', 'fa-gear',
-                'fa-robot', 'fa-network-wired', 'fa-lock', 'fa-globe'
+                'fa-rocket', 'fa-star', 'fa-meteor', 'fa-satellite',
+                'fa-moon', 'fa-sun', 'fa-globe', 'fa-shuttle-space',
+                'fa-satellite-dish', 'fa-star-of-life', 'fa-atom', 'fa-bolt',
+                'fa-fire', 'fa-circle-dot', 'fa-ring', 'fa-sparkles'
             ];
 
             return (
@@ -1644,7 +1823,8 @@
                                 left: Math.random() * 95 + '%',
                                 animationDuration: (Math.random() * 18 + 14) + 's',
                                 animationDelay: (Math.random() * 15) + 's',
-                                fontSize: (Math.random() * 1.2 + 0.8) + 'rem'
+                                fontSize: (Math.random() * 1.2 + 0.8) + 'rem',
+                                color: ['#6366f1','#a855f7','#ec4899','#00d4ff'][i % 4]
                             }}
                         ></i>
                     ))}
@@ -1686,25 +1866,24 @@
 
         // ==================== HERO ====================
         function Hero() {
+            useEffect(() => {
+                initSpaceScene();
+            }, []);
+
             return (
                 <section className="hero" id="home">
-                    <div className="circuit-grid"></div>
-                    <div className="glow-orb glow-orb-1"></div>
-                    <div className="glow-orb glow-orb-2"></div>
-                    <div className="glow-orb glow-orb-3"></div>
-                    <MatrixRain />
                     <FloatingIcons />
 
                     <div className="hero-content">
                         <div className="hero-badge">
-                            <i className="fas fa-terminal"></i>
-                            &gt; initializing celebration_2026.exe<span className="blink">_</span>
+                            <i className="fas fa-rocket"></i>
+                            &gt; launching celebration_2026<span className="blink">_</span>
                         </div>
 
                         <h1>
                             <span className="cyber-text">Freshers</span> &amp;{' '}
                             <span className="cyber-text">Farewell</span>
-                            <span className="accent-text">// IT Department 2026</span>
+                            <span className="accent-text">✦ IT Department 2026</span>
                         </h1>
 
                         <p className="hero-subtitle">
@@ -1722,7 +1901,7 @@
                         </div>
 
                         <div className="terminal-line">
-                            <span className="prompt">$</span> <span className="cmd">party.init</span> --date="TBA" --duration="4-5hrs" --time="noon"
+                            <span className="prompt">✦</span> <span className="cmd">party.init</span> --date="TBA" --duration="4-5hrs" --time="noon"
                         </div>
                     </div>
                 </section>
