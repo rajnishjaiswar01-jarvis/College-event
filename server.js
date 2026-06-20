@@ -26,7 +26,10 @@ app.set('trust proxy', 1);
 // Helmet: Sets various HTTP headers for security
 app.use(helmet({
     contentSecurityPolicy: false, // Disable CSP since our HTML loads external CDNs
-    crossOriginEmbedderPolicy: false
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginResourcePolicy: false,
+    originAgentCluster: false
 }));
 
 // CORS: Only allow same-origin in production
