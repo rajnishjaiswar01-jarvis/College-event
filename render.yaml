@@ -15,7 +15,9 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
-      - key: ADMIN_PASSWORD
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: SESSION_SECRET
         sync: false
       - key: PORT
         value: 10000
