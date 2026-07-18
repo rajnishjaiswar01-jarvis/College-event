@@ -1,5 +1,5 @@
 // ============================================================
-// Event Registration Backend Server (SECURED)
+// Event Registration Backend Server (SECURED v2)
 // IT Department Freshers & Farewell 2026
 // ============================================================
 
@@ -13,6 +13,8 @@ const QRCode = require('qrcode');
 const crypto = require('crypto');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -36,11 +38,28 @@ app.use(helmet({
 app.use(cors({
     origin: process.env.ALLOWED_ORIGIN || '*',
     methods: ['GET', 'POST', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'X-Admin-Password']
+    credentials: true
 }));
 
 // Body parser with size limit to prevent payload attacks
 app.use(express.json({ limit: '10kb' }));
+
+// ==================== SESSION MIDDLEWARE ====================
+
+const isProduction = !!process.env.RENDER || process.env.NODE_ENV === 'production';
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || crypto.randomBytes(48).toString('hex'),
+    name: 'sid',              // Don't use default 'connect.sid' — reveals tech stack
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        httpOnly: true,       // Can't be accessed via JavaScript (prevents XSS cookie theft)
+        secure: isProduction, // HTTPS only in production
+        sameSite: 'strict',   // Prevents CSRF
+        maxAge: 2 * 60 * 60 * 1000  // 2 hours
+    }
+}));
 
 // Global rate limiter: 100 requests per 15 min per IP
 const globalLimiter = rateLimit({
@@ -82,6 +101,12 @@ app.use((req, res, next) => {
             return res.status(403).json({ error: 'Access denied.' });
         }
     }
+
+    // Block direct access to admin.html and scanner.html — must go through /admin and /scanner routes
+    if (reqPath === 'admin.html' || reqPath === 'scanner.html') {
+        return res.status(403).send('Access denied. Use /admin or /scanner.');
+    }
+
     next();
 });
 
@@ -295,15 +320,18 @@ function validatePhone(phone) {
 const VALID_ROLES = ['FY', 'SY', 'TY', 'Ex-TY', 'Principal', 'Teaching Faculty', 'Non-Teaching Faculty'];
 
 // ==================== AUTH MIDDLEWARE ====================
-function requireAdmin(req, res, next) {
-    const pw = req.headers['x-admin-password'];
-    if (!pw || pw !== process.env.ADMIN_PASSWORD) {
-        // Delay response to slow brute-force
-        return setTimeout(() => {
-            res.status(401).json({ error: 'Unauthorized.' });
-        }, 500);
+
+// Session-based admin authentication (replaces old X-Admin-Password header check)
+function requireSession(req, res, next) {
+    if (req.session && req.session.isAdmin) {
+        return next();
     }
-    next();
+    // For API routes, return 401 JSON
+    if (req.path.startsWith('/api/')) {
+        return res.status(401).json({ error: 'Session expired. Please log in again.' });
+    }
+    // For page routes, redirect to login
+    return res.redirect('/login');
 }
 
 // ==================== EMAIL TEMPLATES ====================
@@ -362,6 +390,27 @@ function getRejectionEmailHTML(name) {
 <p style="color:#7a8ba8;font-size:12px;margin:0;">© 2026 IT Department Student Council</p></div></div></body></html>`;
 }
 
+// ==================== PROTECTED PAGE ROUTES ====================
+
+// Login page — public
+app.get('/login', (req, res) => {
+    // If already logged in, redirect to admin
+    if (req.session && req.session.isAdmin) {
+        return res.redirect('/admin');
+    }
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+// Admin dashboard — requires valid session
+app.get('/admin', requireSession, (req, res) => {
+    res.sendFile(path.join(__dirname, 'admin.html'));
+});
+
+// Scanner page — requires valid session
+app.get('/scanner', requireSession, (req, res) => {
+    res.sendFile(path.join(__dirname, 'scanner.html'));
+});
+
 // ==================== API ROUTES ====================
 
 // --- PUBLIC: Register ---
@@ -407,18 +456,68 @@ app.post('/api/register', registerLimiter, (req, res) => {
     }
 });
 
-// --- ADMIN: Login ---
-app.post('/api/admin/login', loginLimiter, (req, res) => {
-    const { password } = req.body;
-    if (password === process.env.ADMIN_PASSWORD) {
-        res.json({ success: true });
-    } else {
-        setTimeout(() => res.status(401).json({ error: 'Invalid password.' }), 500);
+// --- ADMIN: Login (with bcrypt + session regeneration) ---
+app.post('/api/admin/login', loginLimiter, async (req, res) => {
+    try {
+        const { password } = req.body;
+
+        if (!password || typeof password !== 'string') {
+            return setTimeout(() => res.status(401).json({ error: 'Invalid password.' }), 500);
+        }
+
+        const hash = process.env.ADMIN_PASSWORD_HASH;
+        if (!hash) {
+            console.error('❌ ADMIN_PASSWORD_HASH not set in .env');
+            return res.status(500).json({ error: 'Server configuration error.' });
+        }
+
+        const isValid = await bcrypt.compare(password, hash);
+
+        if (!isValid) {
+            // Delay response to slow brute-force
+            return setTimeout(() => res.status(401).json({ error: 'Invalid password.' }), 500);
+        }
+
+        // Regenerate session to prevent session fixation attacks
+        req.session.regenerate((err) => {
+            if (err) {
+                console.error('Session regeneration error:', err);
+                return res.status(500).json({ error: 'Server error.' });
+            }
+
+            req.session.isAdmin = true;
+            req.session.loginAt = Date.now();
+
+            console.log(`🔐 Admin logged in from ${req.ip}`);
+            res.json({ success: true, redirect: '/admin' });
+        });
+    } catch (err) {
+        console.error('Login error:', err);
+        res.status(500).json({ error: 'Server error.' });
     }
 });
 
+// --- ADMIN: Check session validity ---
+app.get('/api/admin/session', (req, res) => {
+    if (req.session && req.session.isAdmin) {
+        return res.json({ valid: true, loginAt: req.session.loginAt });
+    }
+    res.status(401).json({ valid: false });
+});
+
+// --- ADMIN: Logout (destroy session + clear cookie) ---
+app.post('/api/admin/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout error:', err);
+        }
+        res.clearCookie('sid');
+        res.json({ success: true });
+    });
+});
+
 // --- ADMIN: Get registrations ---
-app.get('/api/admin/registrations', requireAdmin, (req, res) => {
+app.get('/api/admin/registrations', requireSession, (req, res) => {
     try {
         const { status } = req.query;
         let rows;
@@ -444,7 +543,7 @@ app.get('/api/admin/registrations', requireAdmin, (req, res) => {
 });
 
 // --- ADMIN: Approve ---
-app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
+app.post('/api/admin/approve/:id', requireSession, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
@@ -486,7 +585,7 @@ app.post('/api/admin/approve/:id', requireAdmin, async (req, res) => {
 });
 
 // --- ADMIN: Reject ---
-app.post('/api/admin/reject/:id', requireAdmin, async (req, res) => {
+app.post('/api/admin/reject/:id', requireSession, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
@@ -519,7 +618,7 @@ app.post('/api/admin/reject/:id', requireAdmin, async (req, res) => {
 });
 
 // --- ADMIN: Delete ---
-app.delete('/api/admin/delete/:id', requireAdmin, (req, res) => {
+app.delete('/api/admin/delete/:id', requireSession, (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
@@ -537,7 +636,7 @@ app.delete('/api/admin/delete/:id', requireAdmin, (req, res) => {
 });
 
 // --- ADMIN: Check-in via QR scan ---
-app.post('/api/admin/checkin/:token', requireAdmin, (req, res) => {
+app.post('/api/admin/checkin/:token', requireSession, (req, res) => {
     try {
         const token = req.params.token;
         if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid QR code.' });
@@ -577,7 +676,7 @@ app.post('/api/admin/checkin/:token', requireAdmin, (req, res) => {
 });
 
 // --- ADMIN: Attendance list ---
-app.get('/api/admin/attendance', requireAdmin, (req, res) => {
+app.get('/api/admin/attendance', requireSession, (req, res) => {
     try {
         const attended = dbAll("SELECT id, name, email, phone, role, attended_at FROM registrations WHERE attended = 1 ORDER BY attended_at DESC");
         const totalApproved = (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'approved'") || {}).count || 0;
@@ -612,7 +711,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- Admin: Test email (verify email works on production) ---
-app.post('/api/admin/test-email', requireAdmin, async (req, res) => {
+app.post('/api/admin/test-email', requireSession, async (req, res) => {
     if (!emailReady) {
         return res.status(500).json({ error: 'Email not configured. Set BREVO_API_KEY in Render Environment (free at https://app.brevo.com).' });
     }
@@ -667,7 +766,7 @@ app.get('/', (req, res) => {
     res.redirect('/invitation.html');
 });
 
-// Serve static files (AFTER API routes so they take priority)
+// Serve static files (AFTER API routes and protected page routes)
 app.use(express.static(__dirname, {
     dotfiles: 'deny'
 }));
@@ -693,9 +792,10 @@ initDatabase().then(() => {
         console.log(`\n🚀 Server running!`);
         console.log(`📄 PC:     http://localhost:${PORT}/invitation.html`);
         console.log(`📱 Mobile: http://${localIP}:${PORT}/invitation.html`);
-        console.log(`🔐 Admin:  http://localhost:${PORT}/admin.html`);
-        console.log(`🎫 Scanner: http://${localIP}:${PORT}/scanner.html`);
-        console.log(`\n🛡️  Security: Helmet, Rate Limiting, Input Sanitization — ACTIVE`);
+        console.log(`🔐 Admin:  http://localhost:${PORT}/admin`);
+        console.log(`🎫 Scanner: http://${localIP}:${PORT}/scanner`);
+        console.log(`🔑 Login:  http://localhost:${PORT}/login`);
+        console.log(`\n🛡️  Security: Helmet, Rate Limiting, bcrypt, express-session, HttpOnly Cookies — ACTIVE`);
         console.log(`-------------------------------------------\n`);
     });
 }).catch(err => {
