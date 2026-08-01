@@ -2136,26 +2136,27 @@
         // ==================== CONTACT SECTION ====================
         function ContactSection() {
             const contacts = [
-                { name: 'Event Coordinator', role: 'General Queries', icon: 'fa-headset', bg: 'linear-gradient(135deg, #00f5ff, #0a84ff)', phone: '+91 XXXXX XXXXX', email: 'event@itdept.edu' },
-                { name: 'Student Council', role: 'Registration Help', icon: 'fa-users', bg: 'linear-gradient(135deg, #bf5af2, #ff2d55)', phone: '+91 XXXXX XXXXX', email: 'council@itdept.edu' },
-                { name: 'Faculty Advisor', role: 'Official Queries', icon: 'fa-user-tie', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', phone: '+91 XXXXX XXXXX', email: 'faculty@itdept.edu' }
+                { label: 'Phone', icon: 'fa-phone', bg: 'linear-gradient(135deg, #00f5ff, #0a84ff)', value: '+91 9221826875', href: 'tel:+919221826875' },
+                { label: 'Phone', icon: 'fa-phone', bg: 'linear-gradient(135deg, #bf5af2, #ff2d55)', value: '+91 9136605076', href: 'tel:+919136605076' },
+                { label: 'Email', icon: 'fa-envelope', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', value: 'rajnishjaiswar01@gmail.com', href: 'mailto:rajnishjaiswar01@gmail.com' },
+                { label: 'Instagram', icon: 'fa-instagram fab', bg: 'linear-gradient(135deg, #ec4899, #f472b6)', value: '@Siddharth_college_bscit', href: 'https://instagram.com/Siddharth_college_bscit' }
             ];
             return (
                 <section className="contact-section" id="contact">
                     <div className="section-tag"><i className="fas fa-envelope"></i> contact.support()</div>
-                    <h2 className="section-title">Got Questions?</h2>
+                    <h2 className="section-title">Queries</h2>
                     <p className="section-subtitle">Reach out to us for any queries regarding the event. We're happy to help!</p>
                     <div className="contact-grid">
                         {contacts.map((c, i) => (
                             <div key={i} className="contact-card reveal">
                                 <div className="contact-icon" style={{ background: c.bg }}>
-                                    <i className={`fas ${c.icon}`}></i>
+                                    <i className={c.icon.includes('fab') ? c.icon : `fas ${c.icon}`}></i>
                                 </div>
-                                <h3>{c.role}</h3>
-                                <p className="contact-name">{c.name}</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center' }}>
-                                    <a href={`tel:${c.phone}`} className="contact-link"><i className="fas fa-phone"></i> {c.phone}</a>
-                                    <a href={`mailto:${c.email}`} className="contact-link"><i className="fas fa-envelope"></i> {c.email}</a>
+                                <h3>{c.label}</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', marginTop: '8px' }}>
+                                    <a href={c.href} className="contact-link" target={c.label === 'Instagram' ? '_blank' : undefined} rel={c.label === 'Instagram' ? 'noopener noreferrer' : undefined}>
+                                        <i className={c.icon.includes('fab') ? c.icon : `fas ${c.icon}`}></i> {c.value}
+                                    </a>
                                 </div>
                             </div>
                         ))}
