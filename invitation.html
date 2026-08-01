@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Freshers & Farewell 2026 — IT Department</title>
+    <title>FreshFare 2K26 | Siddharth College of Commerce & Economics</title>
     <meta name="description"
-        content="IT Department Freshers & Farewell 2026. A tech-themed celebration with music, performances, and great vibes.">
+        content="Official registration portal for FreshFare 2K26 organized by the Department of Information Technology, Siddharth College of Commerce & Economics.">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1845,11 +1845,11 @@
 
             return (
                 <nav className={`navbar ${scrolled ? 'scrolled' : ''}`}>
-                    <div className="nav-logo">IT_DEPT_2026</div>
+                    <div className="nav-logo">FreshFare_2K26</div>
                     <ul className={`nav-links ${menuOpen ? 'open' : ''}`}>
                         <li><a href="#home" onClick={() => setMenuOpen(false)}>Home</a></li>
                         <li><a href="#event" onClick={() => setMenuOpen(false)}>Event</a></li>
-                        <li><a href="#schedule" onClick={() => setMenuOpen(false)}>Schedule</a></li>
+                        <li><a href="#countdown" onClick={() => setMenuOpen(false)}>Countdown</a></li>
                         <li><a href="#dresscode" onClick={() => setMenuOpen(false)}>Dress Code</a></li>
                         <li><a href="#notices" onClick={() => setMenuOpen(false)}>Rules</a></li>
                         <li><a href="#contact" onClick={() => setMenuOpen(false)}>Contact</a></li>
@@ -1881,8 +1881,8 @@
                         </div>
 
                         <h1>
-                            <span className="cyber-text">Freshers</span> &amp;{' '}
-                            <span className="cyber-text">Farewell</span>
+                            <span className="cyber-text">FreshFare</span>{' '}
+                            <span className="cyber-text">2K26</span>
                             <span className="accent-text">✦ IT Department 2026</span>
                         </h1>
 
@@ -1901,7 +1901,7 @@
                         </div>
 
                         <div className="terminal-line">
-                            <span className="prompt">✦</span> <span className="cmd">party.init</span> --date="TBA" --duration="4-5hrs" --time="noon"
+                            <span className="prompt">✦</span> <span className="cmd">party.init</span> --date="29-Aug-2026" --duration="11AM-4PM" --venue="Sana Hall"
                         </div>
                     </div>
                 </section>
@@ -1915,7 +1915,7 @@
                     <div className="section-tag"><i className="fas fa-code"></i> event.details()</div>
                     <h2 className="section-title">One Big Celebration</h2>
                     <p className="section-subtitle">
-                        Freshers meet &amp; farewell merged into one mega event — compiled, linked, and ready to execute.
+                        FreshFare 2K26 — one mega event for the IT department, compiled, linked, and ready to execute.
                     </p>
                     <div className="events-grid" style={{ maxWidth: '520px' }}>
                         <div className="event-card reveal">
@@ -1939,11 +1939,13 @@
                                 </div>
                             </div>
                             <div className="event-card-body">
-                                <h3>Freshers &amp; Farewell 2026</h3>
-                                <p>One massive celebration for the entire IT department! Welcome the new batch and bid farewell to our graduating seniors — all in one unforgettable afternoon of music, performances, and great vibes.</p>
+                                <h3>FreshFare 2K26</h3>
+                                <p>One massive celebration for the entire IT department! Welcome the new batch and bid farewell to our graduating seniors — all in one unforgettable day of music, performances, and great vibes.</p>
                                 <div className="event-meta">
-                                    <div className="event-meta-item"><i className="fas fa-calendar-alt"></i> To be announced</div>
-                                    <div className="event-meta-item"><i className="fas fa-clock"></i> 4-5 hours (Noon)</div>
+                                    <div className="event-meta-item"><i className="fas fa-calendar-alt"></i> 29 August 2026</div>
+                                    <div className="event-meta-item"><i className="fas fa-clock"></i> 11:00 AM – 4:00 PM</div>
+                                    <div className="event-meta-item"><i className="fas fa-location-dot"></i> Sana Hall</div>
+                                    <div className="event-meta-item"><i className="fas fa-palette"></i> Theme: Met Gala</div>
                                 </div>
                             </div>
                         </div>
@@ -1987,9 +1989,9 @@
         // ==================== VENUE / DATE / TIME ====================
         function VenueSection() {
             const items = [
-                { icon: 'fa-location-dot', bg: 'linear-gradient(135deg, #00f5ff, #0a84ff)', label: 'venue', value: 'To be announced', sub: 'Final venue will be confirmed soon' },
-                { icon: 'fa-calendar-days', bg: 'linear-gradient(135deg, #bf5af2, #ff2d55)', label: 'date', value: 'To be announced', sub: 'Stay tuned for the exact date' },
-                { icon: 'fa-clock', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', label: 'time', value: 'Noon (4-5 hrs)', sub: 'Afternoon celebration' }
+                { icon: 'fa-location-dot', bg: 'linear-gradient(135deg, #00f5ff, #0a84ff)', label: 'venue', value: 'Sana Hall', sub: 'The grand celebration awaits' },
+                { icon: 'fa-calendar-days', bg: 'linear-gradient(135deg, #bf5af2, #ff2d55)', label: 'date', value: '29 August 2026', sub: 'Mark your calendars!' },
+                { icon: 'fa-clock', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', label: 'time', value: '11:00 AM – 4:00 PM', sub: 'Full day celebration' }
             ];
             return (
                 <section className="venue-section" id="venue">
@@ -2014,25 +2016,15 @@
 
         // ==================== DRESS CODE ====================
         function DressCodeSection() {
-            const items = [
-                { icon: 'fa-shirt', text: 'Semi-Formal / Smart Casual' },
-                { icon: 'fa-palette', text: 'Preferred: Black & White Theme' },
-                { icon: 'fa-ban', text: 'No Slippers / Flip-Flops' },
-                { icon: 'fa-star', text: 'Traditional wear welcome' }
-            ];
             return (
                 <section className="dresscode-section" id="dresscode">
                     <div className="section-tag"><i className="fas fa-tshirt"></i> style.config()</div>
                     <h2 className="section-title">Dress Code</h2>
-                    <p className="section-subtitle">Look your best! Here's the recommended dress code for the celebration.</p>
+                    <p className="section-subtitle">Theme: Met Gala</p>
                     <div className="dresscode-card reveal">
-                        <div className="dresscode-items">
-                            {items.map((item, i) => (
-                                <div key={i} className="dresscode-item">
-                                    <i className={`fas ${item.icon}`}></i>
-                                    <span>{item.text}</span>
-                                </div>
-                            ))}
+                        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>👗</div>
+                            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '8px', background: 'linear-gradient(135deg, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Met Gala — Your Style, Your Choice.</h3>
                         </div>
                         <div className="dresscode-note">
                             <span className="prompt">$</span> echo "Dress to impress — make it a memorable celebration! ✨"
@@ -2042,33 +2034,66 @@
             );
         }
 
-        // ==================== SCHEDULE / TIMELINE ====================
-        function ScheduleSection() {
-            const timeline = [
-                { time: 'TBD', title: 'Arrival & Registration', desc: 'Check-in and get your event badges', tbd: true },
-                { time: 'TBD', title: 'Opening Ceremony', desc: 'Welcome speech and introduction', tbd: true },
-                { time: 'TBD', title: 'Freshers Introduction', desc: 'New batch welcome and ice-breaker round', tbd: true },
-                { time: 'TBD', title: 'Performances & Acts', desc: 'Dance, music, and special performances', tbd: true },
-                { time: 'TBD', title: 'EX-TY Farewell Reels', desc: 'Emotional farewell showcase for seniors', tbd: true },
-                { time: 'TBD', title: 'Games & Fun Activities', desc: 'Interactive games and competitions', tbd: true },
-                { time: 'TBD', title: 'Food & Refreshments', desc: 'Delicious food for everyone', tbd: true },
-                { time: 'TBD', title: 'Dance Party & Closing', desc: 'Grand finale — everyone hits the floor!', tbd: true }
+        // ==================== COUNTDOWN TIMER ====================
+        function CountdownSection() {
+            const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+            const [isLive, setIsLive] = useState(false);
+
+            useEffect(() => {
+                const targetDate = new Date('2026-08-29T05:30:00Z'); // 11:00 AM IST = 05:30 UTC
+                const updateCountdown = () => {
+                    const now = new Date();
+                    const diff = targetDate - now;
+                    if (diff <= 0) {
+                        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+                        setIsLive(true);
+                        return;
+                    }
+                    setTimeLeft({
+                        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+                        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+                        minutes: Math.floor((diff / (1000 * 60)) % 60),
+                        seconds: Math.floor((diff / 1000) % 60)
+                    });
+                };
+                updateCountdown();
+                const interval = setInterval(updateCountdown, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const units = [
+                { label: 'Days', value: timeLeft.days },
+                { label: 'Hours', value: timeLeft.hours },
+                { label: 'Minutes', value: timeLeft.minutes },
+                { label: 'Seconds', value: timeLeft.seconds }
             ];
+
+            if (isLive) {
+                return (
+                    <section className="schedule-section" id="countdown">
+                        <div className="section-tag"><i className="fas fa-bolt"></i> event.status()</div>
+                        <h2 className="section-title" style={{ background: 'linear-gradient(135deg, #39ff14, #00f5ff)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>🎉 FreshFare 2K26 is Live!</h2>
+                        <p className="section-subtitle" style={{ fontSize: '1.15rem' }}>Welcome to the Event. Enjoy the celebration!</p>
+                        <div className="venue-card reveal" style={{ maxWidth: '500px', margin: '24px auto 0', padding: '32px 24px', textAlign: 'center' }}>
+                            <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎊</div>
+                            <p style={{ color: 'var(--neon-cyan)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.85rem' }}>Sana Hall • 29 August 2026 • 11:00 AM – 4:00 PM</p>
+                        </div>
+                    </section>
+                );
+            }
+
             return (
-                <section className="schedule-section" id="schedule">
-                    <div className="section-tag"><i className="fas fa-list-check"></i> schedule.timeline()</div>
-                    <h2 className="section-title">Event Schedule</h2>
-                    <p className="section-subtitle">The timeline for the day — exact timings will be updated soon.</p>
-                    <div className="timeline">
-                        {timeline.map((item, i) => (
-                            <div key={i} className="timeline-item reveal">
-                                <div className="timeline-dot"></div>
-                                <div className="timeline-card">
-                                    <div className="timeline-time">{item.time}</div>
-                                    <h3>{item.title}</h3>
-                                    <p>{item.desc}</p>
-                                    {item.tbd && <div className="timeline-tbd"><i className="fas fa-clock"></i> Time TBD</div>}
+                <section className="schedule-section" id="countdown">
+                    <div className="section-tag"><i className="fas fa-hourglass-half"></i> countdown.timer()</div>
+                    <h2 className="section-title">Countdown to FreshFare 2K26</h2>
+                    <p className="section-subtitle">29 August 2026 • 11:00 AM IST • Sana Hall</p>
+                    <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', maxWidth: '700px', margin: '0 auto' }}>
+                        {units.map((u, i) => (
+                            <div key={i} className="venue-card reveal" style={{ flex: '1', minWidth: '130px', padding: '28px 20px' }}>
+                                <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 'clamp(2rem, 5vw, 3rem)', fontWeight: 800, background: 'linear-gradient(135deg, #a855f7, #6366f1)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+                                    {String(u.value).padStart(2, '0')}
                                 </div>
+                                <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px', textTransform: 'uppercase', letterSpacing: '1px' }}>{u.label}</div>
                             </div>
                         ))}
                     </div>
@@ -2079,13 +2104,10 @@
         // ==================== IMPORTANT NOTICES ====================
         function NoticesSection() {
             const rules = [
-                { icon: 'fa-id-card', text: <><strong>Carry your College ID</strong> — Entry is strictly for IT department students and invited guests only.</> },
                 { icon: 'fa-clock', text: <><strong>Be punctual</strong> — Latecomers may miss the opening ceremony and initial activities.</> },
                 { icon: 'fa-wine-glass', text: <><strong>No alcohol or intoxicants</strong> — Strict action will be taken against violators.</> },
                 { icon: 'fa-user-shield', text: <><strong>Maintain decorum</strong> — Respect all attendees, faculty, and the venue premises.</> },
                 { icon: 'fa-camera', text: <><strong>Photography consent</strong> — Event will be photographed/recorded for official purposes.</> },
-                { icon: 'fa-door-open', text: <><strong>No re-entry</strong> — Once you leave the venue, re-entry is not permitted.</> },
-                { icon: 'fa-utensils', text: <><strong>Outside food not allowed</strong> — Food and refreshments will be provided at the venue.</> },
                 { icon: 'fa-exclamation-triangle', text: <><strong>Damage to property</strong> — Any damage to venue property must be compensated by the responsible individual.</> }
             ];
             return (
@@ -2203,7 +2225,7 @@
                 <section className="register-section" id="register">
                     <div className="section-tag"><i className="fas fa-terminal"></i> register()</div>
                     <h2 className="section-title">Reserve Your Spot</h2>
-                    <p className="section-subtitle">Register for the combined Freshers &amp; Farewell celebration now.</p>
+                    <p className="section-subtitle">Register for FreshFare 2K26 now.</p>
 
                     <div className="register-card reveal">
                         <form onSubmit={handleSubmit} noValidate>
@@ -2264,6 +2286,7 @@
                                     <option value="TY">TY (Third Year)</option>
                                     <option value="Ex-TY">Ex-TY (Graduated)</option>
                                     <option value="Principal">Principal</option>
+                                    <option value="Head of Department">Head of Department</option>
                                     <option value="Teaching Faculty">Teaching Faculty</option>
                                     <option value="Non-Teaching Faculty">Non-Teaching Faculty</option>
                                 </select>
@@ -2280,7 +2303,7 @@
                                 <div className="custom-checkbox">
                                     <i className="fas fa-check"></i>
                                 </div>
-                                <span className="checkbox-label">I will attend the Freshers & Farewell 2026</span>
+                                <span className="checkbox-label">I will attend FreshFare 2K26</span>
                             </label>
                             {errors.willAttend && <div className="form-error" style={{ marginBottom: '8px' }}>// {errors.willAttend}</div>}
 
@@ -2314,7 +2337,7 @@
         function Footer() {
             return (
                 <footer className="footer">
-                    <div className="footer-brand">&gt; IT_DEPT_2026</div>
+                    <div className="footer-brand">&gt; FreshFare_2K26</div>
                     <p className="footer-copy">
                         &copy; 2026 IT Department Student Council Made with <span className="heart"></span> by IT students
                     </p>
@@ -2362,7 +2385,7 @@
                     <VenueSection />
                     <HighlightsSection />
                     <DressCodeSection />
-                    <ScheduleSection />
+                    <CountdownSection />
                     <NoticesSection />
                     <RegistrationForm />
                     <ContactSection />

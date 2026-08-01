@@ -1,6 +1,6 @@
 // ============================================================
 // Event Registration Backend Server (SECURED v2)
-// IT Department Freshers & Farewell 2026
+// IT Department FreshFare 2K26
 // ============================================================
 
 require('dotenv').config({ path: require('path').join(__dirname, '.env') });
@@ -240,7 +240,7 @@ function setupEmail() {
 // Send via Brevo HTTP API (no SMTP, no port restrictions)
 async function sendViaBrevo({ to, subject, html }) {
     const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER;
-    const fromName = 'IT Dept - Freshers & Farewell 2026';
+    const fromName = 'IT Dept - FreshFare 2K26';
 
     const response = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -269,7 +269,7 @@ async function sendViaBrevo({ to, subject, html }) {
 // Send via Gmail SMTP (localhost fallback)
 async function sendViaGmail({ to, subject, html }) {
     const fromEmail = process.env.EMAIL_USER;
-    const fromName = 'IT Dept - Freshers & Farewell 2026';
+    const fromName = 'IT Dept - FreshFare 2K26';
 
     const info = await gmailTransporter.sendMail({
         from: `"${fromName}" <${fromEmail}>`,
@@ -317,7 +317,7 @@ function validatePhone(phone) {
     return /^\d{10}$/.test(phone.replace(/\D/g, ''));
 }
 
-const VALID_ROLES = ['FY', 'SY', 'TY', 'Ex-TY', 'Principal', 'Teaching Faculty', 'Non-Teaching Faculty'];
+const VALID_ROLES = ['FY', 'SY', 'TY', 'Ex-TY', 'Principal', 'Head of Department', 'Teaching Faculty', 'Non-Teaching Faculty'];
 
 // ==================== AUTH MIDDLEWARE ====================
 
@@ -341,7 +341,7 @@ function getApprovalEmailHTML(name, role, qrImageUrl) {
 <div style="max-width:600px;margin:0 auto;background:#0f1624;border:1px solid rgba(0,245,255,0.15);border-radius:16px;overflow:hidden;">
 <div style="background:linear-gradient(135deg,#00f5ff,#0a84ff,#bf5af2);padding:32px;text-align:center;">
 <h1 style="margin:0;color:white;font-size:24px;font-weight:800;">✅ Registration Approved!</h1>
-<p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">IT Department — Freshers &amp; Farewell 2026</p></div>
+<p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">IT Department — FreshFare 2K26</p></div>
 <div style="padding:32px;">
 <p style="color:#e4eaf5;font-size:16px;line-height:1.7;margin:0 0 20px;">Hey <strong style="color:#00f5ff;">${name}</strong>! 🎉</p>
 <p style="color:#7a8ba8;font-size:15px;line-height:1.7;margin:0 0 24px;">Great news! Your registration has been <span style="color:#39ff14;font-weight:600;">approved</span>. You're officially in!</p>
@@ -365,10 +365,11 @@ function getApprovalEmailHTML(name, role, qrImageUrl) {
 <div style="background:rgba(191,90,242,0.05);border:1px solid rgba(191,90,242,0.12);border-radius:12px;padding:20px;margin-bottom:24px;">
 <h3 style="color:#bf5af2;font-size:13px;text-transform:uppercase;letter-spacing:2px;margin:0 0 12px;">Quick Reminders</h3>
 <ul style="color:#7a8ba8;font-size:14px;line-height:2;margin:0;padding-left:20px;">
-<li>Carry your <strong style="color:#e4eaf5;">College ID</strong></li>
-<li>Dress Code: <strong style="color:#e4eaf5;">Semi-Formal / Black &amp; White Theme</strong></li>
-<li>Be on time — <strong style="color:#e4eaf5;">No re-entry</strong></li>
-<li>No outside food or drinks</li></ul></div>
+<li>Venue: <strong style="color:#e4eaf5;">Sana Hall</strong></li>
+<li>Date: <strong style="color:#e4eaf5;">29 August 2026</strong></li>
+<li>Time: <strong style="color:#e4eaf5;">11:00 AM – 4:00 PM</strong></li>
+<li>Theme: <strong style="color:#e4eaf5;">Met Gala</strong></li>
+<li>Dress Code: <strong style="color:#e4eaf5;">Met Gala — Your Style, Your Choice.</strong></li></ul></div>
 <p style="color:#7a8ba8;font-size:14px;line-height:1.7;margin:0;">Get ready for an amazing celebration! 🚀</p></div>
 <div style="border-top:1px solid rgba(0,245,255,0.1);padding:20px;text-align:center;">
 <p style="color:#7a8ba8;font-size:12px;margin:0;">© 2026 IT Department Student Council</p>
@@ -381,7 +382,7 @@ function getRejectionEmailHTML(name) {
 <div style="max-width:600px;margin:0 auto;background:#0f1624;border:1px solid rgba(255,45,85,0.15);border-radius:16px;overflow:hidden;">
 <div style="background:linear-gradient(135deg,#ff2d55,#ff9500);padding:32px;text-align:center;">
 <h1 style="margin:0;color:white;font-size:24px;font-weight:800;">Registration Update</h1>
-<p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">IT Department — Freshers &amp; Farewell 2026</p></div>
+<p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">IT Department — FreshFare 2K26</p></div>
 <div style="padding:32px;">
 <p style="color:#e4eaf5;font-size:16px;line-height:1.7;margin:0 0 20px;">Hey <strong>${name}</strong>,</p>
 <p style="color:#7a8ba8;font-size:15px;line-height:1.7;margin:0 0 24px;">We regret to inform you that your registration could not be approved at this time due to capacity limits or other reasons.</p>
@@ -570,7 +571,7 @@ app.post('/api/admin/approve/:id', requireSession, async (req, res) => {
 
             const result = await sendEmail({
                 to: reg.email,
-                subject: '✅ Registration Approved — Freshers & Farewell 2026',
+                subject: '✅ Registration Approved — FreshFare 2K26',
                 html: getApprovalEmailHTML(reg.name, reg.role, qrImageUrl)
             });
             res.json({ success: true, message: `Approved & email with QR sent to ${reg.email}` });
@@ -603,7 +604,7 @@ app.post('/api/admin/reject/:id', requireSession, async (req, res) => {
         try {
             const result = await sendEmail({
                 to: reg.email,
-                subject: 'Registration Update — Freshers & Farewell 2026',
+                subject: 'Registration Update — FreshFare 2K26',
                 html: getRejectionEmailHTML(reg.name)
             });
             res.json({ success: true, message: `Rejected & email sent to ${reg.email}` });
