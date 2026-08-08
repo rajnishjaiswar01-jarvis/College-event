@@ -367,7 +367,7 @@ function getApprovalEmailHTML(name, role, qrImageUrl) {
 <ul style="color:#7a8ba8;font-size:14px;line-height:2;margin:0;padding-left:20px;">
 <li>Venue: <strong style="color:#e4eaf5;">Sana Hall</strong></li>
 <li>Date: <strong style="color:#e4eaf5;">29 August 2026</strong></li>
-<li>Time: <strong style="color:#e4eaf5;">11:00 AM – 4:00 PM</strong></li>
+<li>Time: <strong style="color:#e4eaf5;">10:30 AM – 4:00 PM</strong></li>
 <li>Theme: <strong style="color:#e4eaf5;">Met Gala</strong></li>
 <li>Dress Code: <strong style="color:#e4eaf5;">Met Gala — Your Style, Your Choice.</strong></li></ul></div>
 <p style="color:#7a8ba8;font-size:14px;line-height:1.7;margin:0;">Get ready for an amazing celebration! 🚀</p></div>

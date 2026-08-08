@@ -1943,7 +1943,7 @@
                                 <p>One massive celebration for the entire IT department! Welcome the new batch and bid farewell to our graduating seniors — all in one unforgettable day of music, performances, and great vibes.</p>
                                 <div className="event-meta">
                                     <div className="event-meta-item"><i className="fas fa-calendar-alt"></i> 29 August 2026</div>
-                                    <div className="event-meta-item"><i className="fas fa-clock"></i> 11:00 AM – 4:00 PM</div>
+                                    <div className="event-meta-item"><i className="fas fa-clock"></i> 10:30 AM – 4:00 PM</div>
                                     <div className="event-meta-item"><i className="fas fa-location-dot"></i> Sana Hall</div>
                                     <div className="event-meta-item"><i className="fas fa-palette"></i> Theme: Met Gala</div>
                                 </div>
@@ -1991,7 +1991,7 @@
             const items = [
                 { icon: 'fa-location-dot', bg: 'linear-gradient(135deg, #00f5ff, #0a84ff)', label: 'venue', value: 'Sana Hall', sub: 'The grand celebration awaits' },
                 { icon: 'fa-calendar-days', bg: 'linear-gradient(135deg, #bf5af2, #ff2d55)', label: 'date', value: '29 August 2026', sub: 'Mark your calendars!' },
-                { icon: 'fa-clock', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', label: 'time', value: '11:00 AM – 4:00 PM', sub: 'Full day celebration' }
+                { icon: 'fa-clock', bg: 'linear-gradient(135deg, #39ff14, #00f5ff)', label: 'time', value: '10:30 AM – 4:00 PM', sub: 'Full day celebration' }
             ];
             return (
                 <section className="venue-section" id="venue">
@@ -2025,6 +2025,10 @@
                         <div style={{ textAlign: 'center', padding: '20px 0' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '16px' }}>👗</div>
                             <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '8px', background: 'linear-gradient(135deg, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Met Gala — Your Style, Your Choice.</h3>
+                            <p style={{ color: 'rgba(122,139,168,0.85)', fontSize: '0.95rem', margin: '12px auto 0', maxWidth: '420px', lineHeight: 1.6 }}>
+                                <span style={{ color: '#e4eaf5', fontWeight: 600 }}>🤵 Men:</span> Suit / Tuxedo / Formal or Party Wear<br/>
+                                <span style={{ fontSize: '0.82rem', color: 'rgba(122,139,168,0.6)', fontStyle: 'italic' }}>Just a suggestion — wear whatever you're comfortable in!</span>
+                            </p>
                         </div>
                         <div className="dresscode-note">
                             <span className="prompt">$</span> echo "Dress to impress — make it a memorable celebration! ✨"
@@ -2040,7 +2044,7 @@
             const [isLive, setIsLive] = useState(false);
 
             useEffect(() => {
-                const targetDate = new Date('2026-08-29T05:30:00Z'); // 11:00 AM IST = 05:30 UTC
+                const targetDate = new Date('2026-08-29T05:00:00Z'); // 10:30 AM IST = 05:00 UTC
                 const updateCountdown = () => {
                     const now = new Date();
                     const diff = targetDate - now;
@@ -2076,7 +2080,7 @@
                         <p className="section-subtitle" style={{ fontSize: '1.15rem' }}>Welcome to the Event. Enjoy the celebration!</p>
                         <div className="venue-card reveal" style={{ maxWidth: '500px', margin: '24px auto 0', padding: '32px 24px', textAlign: 'center' }}>
                             <div style={{ fontSize: '3rem', marginBottom: '12px' }}>🎊</div>
-                            <p style={{ color: 'var(--neon-cyan)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.85rem' }}>Sana Hall • 29 August 2026 • 11:00 AM – 4:00 PM</p>
+                            <p style={{ color: 'var(--neon-cyan)', fontFamily: "'JetBrains Mono', monospace", fontSize: '0.85rem' }}>Sana Hall • 29 August 2026 • 10:30 AM – 4:00 PM</p>
                         </div>
                     </section>
                 );
@@ -2086,7 +2090,7 @@
                 <section className="schedule-section" id="countdown">
                     <div className="section-tag"><i className="fas fa-hourglass-half"></i> countdown.timer()</div>
                     <h2 className="section-title">Countdown to FreshFare 2K26</h2>
-                    <p className="section-subtitle">29 August 2026 • 11:00 AM IST • Sana Hall</p>
+                    <p className="section-subtitle">29 August 2026 • 10:30 AM IST • Sana Hall</p>
                     <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', flexWrap: 'wrap', maxWidth: '700px', margin: '0 auto' }}>
                         {units.map((u, i) => (
                             <div key={i} className="venue-card reveal" style={{ flex: '1', minWidth: '130px', padding: '28px 20px' }}>
