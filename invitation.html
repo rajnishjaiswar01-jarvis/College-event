@@ -2022,13 +2022,21 @@
                     <h2 className="section-title">Dress Code</h2>
                     <p className="section-subtitle">Theme: Met Gala</p>
                     <div className="dresscode-card reveal">
-                        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                            <div style={{ fontSize: '3rem', marginBottom: '16px' }}>👗</div>
-                            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '8px', background: 'linear-gradient(135deg, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Met Gala — Your Style, Your Choice.</h3>
-                            <p style={{ color: 'rgba(122,139,168,0.85)', fontSize: '0.95rem', margin: '12px auto 0', maxWidth: '420px', lineHeight: 1.6 }}>
-                                <span style={{ color: '#e4eaf5', fontWeight: 600 }}>🤵 Men:</span> Suit / Tuxedo / Formal or Party Wear<br/>
-                                <span style={{ fontSize: '0.82rem', color: 'rgba(122,139,168,0.6)', fontStyle: 'italic' }}>Just a suggestion — wear whatever you're comfortable in!</span>
-                            </p>
+                        <div style={{ textAlign: 'center', padding: '20px 0 12px' }}>
+                            <h3 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '4px', background: 'linear-gradient(135deg, #a855f7, #ec4899)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>Met Gala — Your Style, Your Choice.</h3>
+                            <p style={{ color: 'rgba(122,139,168,0.55)', fontSize: '0.78rem', fontStyle: 'italic', margin: '6px 0 0' }}>Outfit inspiration — wear whatever makes you feel confident!</p>
+                        </div>
+                        <div className="dresscode-items">
+                            <div className="dresscode-item" style={{ flexDirection: 'column', textAlign: 'center', padding: '24px 16px', gap: '8px' }}>
+                                <div style={{ fontSize: '2.5rem', lineHeight: 1 }}>👗</div>
+                                <span style={{ color: '#e4eaf5', fontWeight: 700, fontSize: '1rem' }}>Female</span>
+                                <span style={{ fontSize: '0.82rem', color: 'rgba(122,139,168,0.85)', fontWeight: 400, lineHeight: 1.5 }}>Gown / Dress / Ethnic Wear / Formal or Party Wear</span>
+                            </div>
+                            <div className="dresscode-item" style={{ flexDirection: 'column', textAlign: 'center', padding: '24px 16px', gap: '8px' }}>
+                                <div style={{ fontSize: '2.5rem', lineHeight: 1 }}>🤵</div>
+                                <span style={{ color: '#e4eaf5', fontWeight: 700, fontSize: '1rem' }}>Male</span>
+                                <span style={{ fontSize: '0.82rem', color: 'rgba(122,139,168,0.85)', fontWeight: 400, lineHeight: 1.5 }}>Suit / Tuxedo / Formal Wear / Party Wear</span>
+                            </div>
                         </div>
                         <div className="dresscode-note">
                             <span className="prompt">$</span> echo "Dress to impress — make it a memorable celebration! ✨"
