@@ -112,10 +112,19 @@ app.use((req, res, next) => {
 
 const { createClient } = require('@supabase/supabase-js');
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SECRET_KEY
-);
+let supabase = null;
+try {
+    if (process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY) {
+        supabase = createClient(
+            process.env.SUPABASE_URL,
+            process.env.SUPABASE_SECRET_KEY
+        );
+    } else {
+        console.warn('⚠️ SUPABASE_URL or SUPABASE_SECRET_KEY missing — Supabase client not created');
+    }
+} catch (err) {
+    console.error('❌ Failed to create Supabase client:', err.message);
+}
 
 async function initDatabase() {
     // Check if Supabase env vars are configured
