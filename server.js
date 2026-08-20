@@ -7,7 +7,6 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const fs = require('fs');
 const nodemailer = require('nodemailer');
 const QRCode = require('qrcode');
 const crypto = require('crypto');
@@ -15,7 +14,6 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
-
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -110,77 +108,29 @@ app.use((req, res, next) => {
     next();
 });
 
-// ==================== DATABASE SETUP (sql.js) ====================
-const initSqlJs = require('sql.js');
-let db;
-const DB_PATH = path.join(__dirname, 'database.sqlite');
+// ==================== DATABASE SETUP (Supabase) ====================
+
+const { createClient } = require('@supabase/supabase-js');
+
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SECRET_KEY
+);
 
 async function initDatabase() {
-    const SQL = await initSqlJs();
+    const { data, error } = await supabase
+        .from('registrations')
+        .select('id')
+        .limit(1);
 
-    // Load existing DB or create new one
-    if (fs.existsSync(DB_PATH)) {
-        const fileBuffer = fs.readFileSync(DB_PATH);
-        db = new SQL.Database(fileBuffer);
-        console.log('✅ Database loaded from file');
-    } else {
-        db = new SQL.Database();
-        console.log('✅ New database created');
+    if (error) {
+        console.error('❌ Supabase connection failed:', error.message);
+        throw error;
     }
 
-    // Create table
-    db.run(`
-        CREATE TABLE IF NOT EXISTS registrations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            phone TEXT NOT NULL,
-            role TEXT NOT NULL,
-            status TEXT DEFAULT 'pending',
-            checkin_token TEXT,
-            attended INTEGER DEFAULT 0,
-            attended_at TEXT,
-            created_at TEXT DEFAULT (datetime('now')),
-            updated_at TEXT DEFAULT (datetime('now'))
-        )
-    `);
-
-    // Migrate existing DB: add new columns if missing
-    try { db.run('ALTER TABLE registrations ADD COLUMN checkin_token TEXT'); } catch(e) { /* column exists */ }
-    try { db.run('ALTER TABLE registrations ADD COLUMN attended INTEGER DEFAULT 0'); } catch(e) { /* column exists */ }
-    try { db.run('ALTER TABLE registrations ADD COLUMN attended_at TEXT'); } catch(e) { /* column exists */ }
-
-    saveDatabase();
+    console.log('✅ Supabase database connected');
+    console.log('📊 registrations table is accessible');
 }
-
-function saveDatabase() {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(DB_PATH, buffer);
-}
-
-// Helper to run queries and return results as array of objects
-function dbAll(sql, params = []) {
-    const stmt = db.prepare(sql);
-    if (params.length) stmt.bind(params);
-    const results = [];
-    while (stmt.step()) {
-        results.push(stmt.getAsObject());
-    }
-    stmt.free();
-    return results;
-}
-
-function dbGet(sql, params = []) {
-    const results = dbAll(sql, params);
-    return results.length ? results[0] : null;
-}
-
-function dbRun(sql, params = []) {
-    db.run(sql, params);
-    saveDatabase();
-}
-
 // ==================== PRODUCTION EMAIL SYSTEM ====================
 // Strategy: Brevo HTTP API (production) + Gmail SMTP fallback (localhost)
 //
@@ -415,7 +365,7 @@ app.get('/scanner', requireSession, (req, res) => {
 // ==================== API ROUTES ====================
 
 // --- PUBLIC: Register ---
-app.post('/api/register', registerLimiter, (req, res) => {
+app.post('/api/register', registerLimiter, async (req, res) => {
     try {
         const name = sanitize(req.body.name);
         const email = sanitize(req.body.email).toLowerCase();
@@ -425,35 +375,71 @@ app.post('/api/register', registerLimiter, (req, res) => {
         if (!name || !email || !phone || !role) {
             return res.status(400).json({ error: 'All fields are required.' });
         }
+
         if (name.length < 2) {
             return res.status(400).json({ error: 'Name must be at least 2 characters.' });
         }
+
         if (!validateEmail(email)) {
             return res.status(400).json({ error: 'Invalid email address.' });
         }
+
         if (!validatePhone(phone)) {
-            return res.status(400).json({ error: 'Invalid phone number. Must be 10 digits.' });
+            return res.status(400).json({
+                error: 'Invalid phone number. Must be 10 digits.'
+            });
         }
+
         if (!VALID_ROLES.includes(role)) {
             return res.status(400).json({ error: 'Invalid role selected.' });
         }
 
-        // Check duplicate
-        const existing = dbGet('SELECT id FROM registrations WHERE email = ?', [email]);
+        // Check duplicate email
+        const { data: existing } = await supabase
+            .from('registrations')
+            .select('id')
+            .eq('email', email)
+            .maybeSingle();
+
         if (existing) {
-            return res.status(409).json({ error: 'This email is already registered.' });
+            return res.status(409).json({
+                error: 'This email is already registered.'
+            });
         }
 
-        dbRun(
-            `INSERT INTO registrations (name, email, phone, role, status, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))`,
-            [name, email, phone, role]
-        );
+        // Insert registration into Supabase
+        const { error: insertError } = await supabase
+            .from('registrations')
+            .insert({
+                name,
+                email,
+                phone,
+                role,
+                status: 'pending',
+                attended: 0
+            });
+
+        if (insertError) {
+            console.error('Supabase insert error:', insertError);
+            // Duplicate email constraint
+            if (insertError.code === '23505') {
+                return res.status(409).json({ error: 'This email is already registered.' });
+            }
+            return res.status(500).json({ error: 'Server error. Please try again.' });
+        }
 
         console.log(`📝 New registration: ${name} (${email}) — ${role}`);
-        res.status(201).json({ success: true, message: 'Registration submitted! Pending admin approval.' });
+
+        res.status(201).json({
+            success: true,
+            message: 'Registration submitted! Pending admin approval.'
+        });
+
     } catch (err) {
         console.error('Registration error:', err);
-        res.status(500).json({ error: 'Server error. Please try again.' });
+        res.status(500).json({
+            error: 'Server error. Please try again.'
+        });
     }
 });
 
@@ -518,25 +504,32 @@ app.post('/api/admin/logout', (req, res) => {
 });
 
 // --- ADMIN: Get registrations ---
-app.get('/api/admin/registrations', requireSession, (req, res) => {
+app.get('/api/admin/registrations', requireSession, async (req, res) => {
     try {
         const { status } = req.query;
-        let rows;
+        let query = supabase.from('registrations').select('*').order('created_at', { ascending: false });
         if (status && ['pending', 'approved', 'rejected'].includes(status)) {
-            rows = dbAll('SELECT * FROM registrations WHERE status = ? ORDER BY created_at DESC', [status]);
-        } else {
-            rows = dbAll('SELECT * FROM registrations ORDER BY created_at DESC');
+            query = query.eq('status', status);
         }
+        const { data: rows, error: fetchErr } = await query;
+        if (fetchErr) throw fetchErr;
+
+        // Get counts for stats
+        const { count: total } = await supabase.from('registrations').select('*', { count: 'exact', head: true });
+        const { count: pending } = await supabase.from('registrations').select('*', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count: approved } = await supabase.from('registrations').select('*', { count: 'exact', head: true }).eq('status', 'approved');
+        const { count: rejected } = await supabase.from('registrations').select('*', { count: 'exact', head: true }).eq('status', 'rejected');
+        const { count: attended } = await supabase.from('registrations').select('*', { count: 'exact', head: true }).eq('attended', 1);
 
         const stats = {
-            total: (dbGet('SELECT COUNT(*) as count FROM registrations') || {}).count || 0,
-            pending: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'pending'") || {}).count || 0,
-            approved: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'approved'") || {}).count || 0,
-            rejected: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'rejected'") || {}).count || 0,
-            attended: (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0
+            total: total || 0,
+            pending: pending || 0,
+            approved: approved || 0,
+            rejected: rejected || 0,
+            attended: attended || 0
         };
 
-        res.json({ registrations: rows, stats });
+        res.json({ registrations: rows || [], stats });
     } catch (err) {
         console.error('Fetch error:', err);
         res.status(500).json({ error: 'Server error.' });
@@ -549,14 +542,24 @@ app.post('/api/admin/approve/:id', requireSession, async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
 
-        const reg = dbGet('SELECT * FROM registrations WHERE id = ?', [id]);
+        const { data: reg, error: fetchErr } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+        if (fetchErr) throw fetchErr;
         if (!reg) return res.status(404).json({ error: 'Not found.' });
         if (reg.status === 'approved') return res.status(400).json({ error: 'Already approved.' });
 
         // Generate unique check-in token for QR code
         const checkinToken = crypto.randomUUID();
 
-        dbRun("UPDATE registrations SET status = 'approved', checkin_token = ?, updated_at = datetime('now') WHERE id = ?", [checkinToken, id]);
+        const { error: updateErr } = await supabase
+            .from('registrations')
+            .update({ status: 'approved', checkin_token: checkinToken, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        if (updateErr) throw updateErr;
+
         console.log(`✅ Approved: ${reg.name} (${reg.email}) — Token: ${checkinToken.substring(0, 8)}...`);
 
         if (!emailReady) {
@@ -591,11 +594,21 @@ app.post('/api/admin/reject/:id', requireSession, async (req, res) => {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
 
-        const reg = dbGet('SELECT * FROM registrations WHERE id = ?', [id]);
+        const { data: reg, error: fetchErr } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+        if (fetchErr) throw fetchErr;
         if (!reg) return res.status(404).json({ error: 'Not found.' });
         if (reg.status === 'rejected') return res.status(400).json({ error: 'Already rejected.' });
 
-        dbRun("UPDATE registrations SET status = 'rejected', updated_at = datetime('now') WHERE id = ?", [id]);
+        const { error: updateErr } = await supabase
+            .from('registrations')
+            .update({ status: 'rejected', updated_at: new Date().toISOString() })
+            .eq('id', id);
+        if (updateErr) throw updateErr;
+
         console.log(`❌ Rejected: ${reg.name} (${reg.email})`);
 
         if (!emailReady) {
@@ -619,15 +632,25 @@ app.post('/api/admin/reject/:id', requireSession, async (req, res) => {
 });
 
 // --- ADMIN: Delete ---
-app.delete('/api/admin/delete/:id', requireSession, (req, res) => {
+app.delete('/api/admin/delete/:id', requireSession, async (req, res) => {
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return res.status(400).json({ error: 'Invalid ID.' });
 
-        const reg = dbGet('SELECT id FROM registrations WHERE id = ?', [id]);
+        const { data: reg, error: fetchErr } = await supabase
+            .from('registrations')
+            .select('id')
+            .eq('id', id)
+            .maybeSingle();
+        if (fetchErr) throw fetchErr;
         if (!reg) return res.status(404).json({ error: 'Not found.' });
 
-        dbRun('DELETE FROM registrations WHERE id = ?', [id]);
+        const { error: delErr } = await supabase
+            .from('registrations')
+            .delete()
+            .eq('id', id);
+        if (delErr) throw delErr;
+
         console.log(`🗑️ Deleted ID: ${id}`);
         res.json({ success: true, message: 'Deleted.' });
     } catch (err) {
@@ -637,12 +660,17 @@ app.delete('/api/admin/delete/:id', requireSession, (req, res) => {
 });
 
 // --- ADMIN: Check-in via QR scan ---
-app.post('/api/admin/checkin/:token', requireSession, (req, res) => {
+app.post('/api/admin/checkin/:token', requireSession, async (req, res) => {
     try {
         const token = req.params.token;
         if (!token || token.length < 10) return res.status(400).json({ error: 'Invalid QR code.' });
 
-        const reg = dbGet('SELECT * FROM registrations WHERE checkin_token = ?', [token]);
+        const { data: reg, error: fetchErr } = await supabase
+            .from('registrations')
+            .select('*')
+            .eq('checkin_token', token)
+            .maybeSingle();
+        if (fetchErr) throw fetchErr;
         if (!reg) return res.status(404).json({ error: 'Invalid QR code — not found in system.', valid: false });
         if (reg.status !== 'approved') return res.status(400).json({ error: `Registration is ${reg.status}, not approved.`, valid: false });
         if (reg.attended) {
@@ -656,10 +684,18 @@ app.post('/api/admin/checkin/:token', requireSession, (req, res) => {
             });
         }
 
-        dbRun("UPDATE registrations SET attended = 1, attended_at = datetime('now') WHERE id = ?", [reg.id]);
+        const { error: updateErr } = await supabase
+            .from('registrations')
+            .update({ attended: 1, attended_at: new Date().toISOString() })
+            .eq('id', reg.id);
+        if (updateErr) throw updateErr;
+
         console.log(`🎫 Checked in: ${reg.name} (${reg.role})`);
 
-        const attendedCount = (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0;
+        const { count: attendedCount } = await supabase
+            .from('registrations')
+            .select('*', { count: 'exact', head: true })
+            .eq('attended', 1);
 
         res.json({
             success: true,
@@ -668,7 +704,7 @@ app.post('/api/admin/checkin/:token', requireSession, (req, res) => {
             role: reg.role,
             email: reg.email,
             message: `✅ ${reg.name} checked in!`,
-            attendedTotal: attendedCount
+            attendedTotal: attendedCount || 0
         });
     } catch (err) {
         console.error('Check-in error:', err);
@@ -677,18 +713,28 @@ app.post('/api/admin/checkin/:token', requireSession, (req, res) => {
 });
 
 // --- ADMIN: Attendance list ---
-app.get('/api/admin/attendance', requireSession, (req, res) => {
+app.get('/api/admin/attendance', requireSession, async (req, res) => {
     try {
-        const attended = dbAll("SELECT id, name, email, phone, role, attended_at FROM registrations WHERE attended = 1 ORDER BY attended_at DESC");
-        const totalApproved = (dbGet("SELECT COUNT(*) as count FROM registrations WHERE status = 'approved'") || {}).count || 0;
-        const totalAttended = attended.length;
+        const { data: attended, error: fetchErr } = await supabase
+            .from('registrations')
+            .select('id, name, email, phone, role, attended_at')
+            .eq('attended', 1)
+            .order('attended_at', { ascending: false });
+        if (fetchErr) throw fetchErr;
+
+        const { count: totalApproved } = await supabase
+            .from('registrations')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'approved');
+
+        const totalAttended = (attended || []).length;
 
         res.json({
-            attended,
+            attended: attended || [],
             stats: {
-                totalApproved,
+                totalApproved: totalApproved || 0,
                 totalAttended,
-                remaining: totalApproved - totalAttended
+                remaining: (totalApproved || 0) - totalAttended
             }
         });
     } catch (err) {
@@ -698,17 +744,33 @@ app.get('/api/admin/attendance', requireSession, (req, res) => {
 });
 
 // --- Health check (for Render & monitoring) ---
-app.get('/api/health', (req, res) => {
-    const attendedCount = db ? (dbGet("SELECT COUNT(*) as count FROM registrations WHERE attended = 1") || {}).count || 0 : 0;
-    res.json({
-        status: 'ok',
-        email: emailReady ? 'configured' : 'not configured',
-        emailProvider: emailProvider,
-        emailUser: process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 3) + '***' : 'NOT SET',
-        brevoKey: process.env.BREVO_API_KEY ? 'SET' : 'NOT SET',
-        attended: attendedCount,
-        uptime: Math.floor(process.uptime()) + 's'
-    });
+app.get('/api/health', async (req, res) => {
+    try {
+        const { count: attendedCount } = await supabase
+            .from('registrations')
+            .select('*', { count: 'exact', head: true })
+            .eq('attended', 1);
+
+        res.json({
+            status: 'ok',
+            email: emailReady ? 'configured' : 'not configured',
+            emailProvider: emailProvider,
+            emailUser: process.env.EMAIL_USER ? process.env.EMAIL_USER.substring(0, 3) + '***' : 'NOT SET',
+            brevoKey: process.env.BREVO_API_KEY ? 'SET' : 'NOT SET',
+            attended: attendedCount || 0,
+            uptime: Math.floor(process.uptime()) + 's'
+        });
+    } catch (err) {
+        console.error('Health check error:', err);
+        res.json({
+            status: 'ok',
+            email: emailReady ? 'configured' : 'not configured',
+            emailProvider: emailProvider,
+            attended: 0,
+            uptime: Math.floor(process.uptime()) + 's',
+            dbError: 'Could not query database'
+        });
+    }
 });
 
 // --- Admin: Test email (verify email works on production) ---
@@ -736,7 +798,11 @@ app.get('/api/qr/:token', async (req, res) => {
         if (!token || token.length < 10) return res.status(400).send('Invalid token');
 
         // Verify token exists in DB (only show QR for approved registrations)
-        const reg = dbGet('SELECT id, status FROM registrations WHERE checkin_token = ?', [token]);
+        const { data: reg } = await supabase
+            .from('registrations')
+            .select('id, status')
+            .eq('checkin_token', token)
+            .maybeSingle();
         if (!reg || reg.status !== 'approved') return res.status(404).send('Not found');
 
         // Generate QR as PNG buffer
